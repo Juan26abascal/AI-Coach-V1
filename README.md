@@ -31,6 +31,24 @@ This repository bootstraps the MVP for a premium AI running coach experience. It
    ```
 3. Visit `http://localhost:3000`.
 
+## Troubleshooting npm install
+If `npm install` fails with a 403 or proxy-related error, the environment is blocking access to the npm registry.
+Follow these steps:
+1. Ensure the registry is set to the public npm registry:
+   ```bash
+   npm config set registry https://registry.npmjs.org/
+   ```
+2. Clear any proxy environment variables:
+   ```bash
+   unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy
+   ```
+3. Re-run:
+   ```bash
+   npm install
+   ```
+
+We include a `.npmrc` with safe retry defaults to make installs more resilient.
+
 ## Implementation Notes
 - The onboarding flow is required before accessing the chat.
 - Daily check-in is embedded at the top of the chat page.
