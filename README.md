@@ -25,6 +25,7 @@ This repository bootstraps the MVP for a premium AI running coach experience. It
    ```bash
    npm install
    ```
+2. Configure environment variables (see "OpenAI Coach Brain Configuration" below).
 2. Run the dev server:
    ```bash
    npm run dev
@@ -53,7 +54,22 @@ We include a `.npmrc` with safe retry defaults to make installs more resilient.
 - The onboarding flow is required before accessing the chat.
 - Daily check-in is embedded at the top of the chat page.
 - Plans and workouts are fully stored locally for now.
-- Mock coach responses are centralized in `app/lib/coach.ts` for easy replacement.
+- The production coach brain lives in `app/api/coach/route.ts` and uses OpenAI Responses with file_search + structured outputs.
+
+## OpenAI Coach Brain Configuration
+Set the following values in `.env.local` (or your deployment environment):
+```bash
+OPENAI_API_KEY=your_api_key
+OPENAI_VECTOR_STORE_ID=your_vector_store_id
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+### Vector Store Setup
+1. Upload the 14 PDFs into your OpenAI Vector Store.
+2. Copy the Vector Store ID.
+3. Set `OPENAI_VECTOR_STORE_ID` in `.env.local`.
+
+The `/api/coach` route always enables the `file_search` tool with your Vector Store and limits retrieval to 4 chunks per request.
 
 ## Future Expansion
 The architecture is built to support:
