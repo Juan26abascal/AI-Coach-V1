@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { generateCoachResponse } from '@/lib/coach/service';
+import { CoachResponseSchema } from '@/lib/coach/schema';
 import type { CoachBlock } from '@/types';
 
 function buildBlocks(summary: string, prescription: string, integrationNote: string): CoachBlock[] {
@@ -39,9 +40,11 @@ export async function POST(request: Request) {
       context: body?.context,
     });
 
+    const validated = CoachResponseSchema.parse(response);
+
     return NextResponse.json({
-      ...response,
-      blocks: buildBlocks(response.summary, response.prescription, response.integrationNote),
+      ...validated,
+      blocks: buildBlocks(validated.summary, validated.prescription, validated.integrationNote),
     });
   } catch (error) {
     return NextResponse.json({ error: 'Coach response failed.' }, { status: 500 });
