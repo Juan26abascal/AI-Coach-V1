@@ -2,14 +2,12 @@ import type { Athlete, TrainingPlan, Workout, CheckIn, ChatMessage } from '@/typ
 import { CoachResponseSchema, type CoachResponse, coachResponseJsonSchema } from '@/lib/coach/schema';
 import { COACH_SYSTEM_PROMPT, COACH_DEVELOPER_PROMPT } from '@/lib/coach/prompt';
 import { getOpenAIClient } from '@/lib/openaiClient';
-
-type CoachRequestContext = {
-  athlete?: Athlete | null;
-  plan?: TrainingPlan | null;
-  workouts?: Workout[];
-  checkIns?: CheckIn[];
-  recentMessages?: ChatMessage[];
-};
+import {
+  deriveSafetyFlags,
+  fallbackCoachResponse,
+  finalizeCoachResponse,
+  type CoachRequestContext,
+} from '@/lib/coach/guardrails';
 
 type CoachRequest = {
   message: string;
@@ -49,7 +47,9 @@ function formatContext(context?: CoachRequestContext): string {
   return lines.length ? lines.join('\n') : 'No additional context provided.';
 }
 
-export async function generateCoachResponse({ message, context }: CoachRequest): Promise<CoachResponse> {
+async function requestCoachModelResponse(
+  input: Array<{ role: 'system' | 'developer' | 'user'; content: string }>
+): Promise<string | null> {
   const openai = getOpenAIClient();
   const model = process.env.OPENAI_MODEL ?? 'gpt-4.1-mini';
   const vectorStoreId = process.env.OPENAI_VECTOR_STORE_ID;
@@ -61,15 +61,6 @@ export async function generateCoachResponse({ message, context }: CoachRequest):
   if (!vectorStoreId) {
     throw new Error('Missing OPENAI_VECTOR_STORE_ID.');
   }
-
-  const input = [
-    { role: 'system' as const, content: COACH_SYSTEM_PROMPT },
-    { role: 'developer' as const, content: COACH_DEVELOPER_PROMPT },
-    {
-      role: 'user' as const,
-      content: `User request: ${message}\n\nContext:\n${formatContext(context)}`,
-    },
-  ];
 
   const response = await openai.responses.create({
     model,
@@ -91,18 +82,52 @@ export async function generateCoachResponse({ message, context }: CoachRequest):
     },
   });
 
-  const outputText = response.output_text;
+  return response.output_text ?? null;
+}
 
-  if (!outputText) {
-    throw new Error('OpenAI response was empty.');
-  }
-
+function parseCoachResponse(outputText: string | null): CoachResponse | null {
+  if (!outputText) return null;
   let parsed: unknown;
   try {
     parsed = JSON.parse(outputText);
   } catch (error) {
-    throw new Error('OpenAI response was not valid JSON.');
+    return null;
   }
 
-  return CoachResponseSchema.parse(parsed);
+  const result = CoachResponseSchema.safeParse(parsed);
+  return result.success ? result.data : null;
+}
+
+export async function generateCoachResponse({ message, context }: CoachRequest): Promise<CoachResponse> {
+  const safety = deriveSafetyFlags(message, context);
+
+  const input = [
+    { role: 'system' as const, content: COACH_SYSTEM_PROMPT },
+    { role: 'developer' as const, content: COACH_DEVELOPER_PROMPT },
+    {
+      role: 'user' as const,
+      content: `User request: ${message}\n\nContext:\n${formatContext(context)}`,
+    },
+  ];
+
+  const firstOutput = await requestCoachModelResponse(input);
+  let parsed = parseCoachResponse(firstOutput);
+
+  if (!parsed) {
+    const retryOutput = await requestCoachModelResponse([
+      ...input,
+      {
+        role: 'user',
+        content:
+          'Fix to schema: the previous response did not match the JSON schema. Return ONLY a JSON object that matches the schema exactly.',
+      },
+    ]);
+    parsed = parseCoachResponse(retryOutput);
+  }
+
+  if (!parsed) {
+    return fallbackCoachResponse(safety);
+  }
+
+  return finalizeCoachResponse(parsed, safety);
 }

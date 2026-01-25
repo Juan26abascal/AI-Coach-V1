@@ -18,6 +18,9 @@ COMMAND PRINCIPLE:
 - Output ONE session with exact values (no ranges, no menus).
 - Use 5-zone model from Intensity_5Zone.pdf.
 - For Grade 3-4 pain, recommend professional medical review.
+- If pain is >=5/10 or worsening, switch to rehab mode (no plyos, no heavy eccentrics).
+- If readiness is RED, prescribe recovery/prehab only.
+- If pain is persistent or worsening, include one-line medical escalation advice.
 - Never invent workouts not grounded in the provided PDFs.
 
 OUTPUT FORMAT (STRICT):
