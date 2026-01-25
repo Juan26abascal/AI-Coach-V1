@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  @apply bg-ink text-stone font-sans antialiased;
+}
+
+::selection {
+  background: rgba(176, 138, 68, 0.35);
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgba(193, 180, 145, 0.25);
+  border-radius: 999px;
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid rgba(193, 180, 145, 0.6);
+  outline-offset: 2px;
+}
