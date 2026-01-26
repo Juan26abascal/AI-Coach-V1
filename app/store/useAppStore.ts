@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Athlete, TrainingPlan, Workout, ChatMessage, CheckIn } from '@/types';
 import { generateStarterPlan, generateWelcomeMessages } from '@/lib/demo';
+import { recomputeWeeklyPlan } from '@/lib/plan/engine';
 
 export type AppState = {
   athlete: Athlete | null;
@@ -60,9 +61,21 @@ export const useAppStore = create<AppState>()(
       },
       updateAthlete: (athlete) => set({ athlete }),
       addWorkout: (workout) =>
-        set((state) => ({
-          workouts: [workout, ...state.workouts],
-        })),
+        set((state) => {
+          const updatedWorkouts = [workout, ...state.workouts];
+          const updatedPlan = state.athlete
+            ? recomputeWeeklyPlan({
+                athlete: state.athlete,
+                workouts: updatedWorkouts,
+                checkIns: state.checkIns,
+                currentPlan: state.plan,
+              })
+            : state.plan;
+          return {
+            workouts: updatedWorkouts,
+            plan: updatedPlan,
+          };
+        }),
       updatePlan: (plan) => set({ plan }),
       addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
       updateMessage: (id, updates) =>
@@ -111,7 +124,21 @@ export const useAppStore = create<AppState>()(
       },
       addCheckIn: async (checkIn) => {
         const { offline, athlete, plan, workouts, checkIns, messages } = get();
-        set((state) => ({ checkIns: [checkIn, ...state.checkIns], loading: true }));
+        const updatedCheckIns = [checkIn, ...checkIns];
+        const updatedPlan =
+          athlete &&
+          recomputeWeeklyPlan({
+            athlete,
+            workouts,
+            checkIns: updatedCheckIns,
+            currentPlan: plan,
+          });
+
+        set(() => ({
+          checkIns: updatedCheckIns,
+          loading: true,
+          plan: updatedPlan ?? plan,
+        }));
         if (offline) {
           set({ loading: false, error: 'Check-in saved locally. Coach will sync later.' });
           return;
