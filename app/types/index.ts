@@ -18,8 +18,10 @@ export type PlanDay = {
 export type TrainingPlan = {
   id: string;
   weekOf: string;
+  lastUpdated: string;
   days: PlanDay[];
   nextSession: PlanDay | null;
+  nextSessionRationale?: string;
 };
 
 export type Workout = {

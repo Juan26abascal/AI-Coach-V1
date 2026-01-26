@@ -22,6 +22,10 @@ export default function ChatPage() {
     error,
     offline,
     sendMessage,
+    appendMessageContent,
+    updateMessage,
+    setLoading,
+    setError,
     addCheckIn,
     clearError,
     hydrated,
@@ -43,8 +47,99 @@ export default function ChatPage() {
 
   const handleSend = async () => {
     if (!draft.trim()) return;
-    await sendMessage(draft.trim());
+    const content = draft.trim();
+    const { offline: isOffline, coachMessageId, context } = sendMessage(content);
     setDraft('');
+
+    if (isOffline) {
+      setLoading(false);
+      setError('You appear to be offline. Try again when connected.');
+      return;
+    }
+
+    try {
+      const apiResponse = await fetch('/api/coach', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: content,
+          context,
+        }),
+      });
+
+      if (!apiResponse.ok) {
+        throw new Error('Coach response failed.');
+      }
+
+      const contentType = apiResponse.headers.get('content-type') ?? '';
+      if (!apiResponse.body || typeof ReadableStream === 'undefined' || !contentType.includes('application/x-ndjson')) {
+        const data = await apiResponse.json();
+        updateMessage(coachMessageId, {
+          content: data.summary ?? 'Coach response ready.',
+          blocks: data.blocks ?? [],
+        });
+        setLoading(false);
+        return;
+      }
+
+      const reader = apiResponse.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let receivedFinal = false;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          const event = JSON.parse(trimmed) as
+            | { type: 'delta'; text?: string }
+            | { type: 'final'; data?: { summary?: string; blocks?: typeof messages[number]['blocks'] } };
+
+          if (event.type === 'delta' && event.text) {
+            appendMessageContent(coachMessageId, event.text);
+          }
+
+          if (event.type === 'final' && event.data) {
+            updateMessage(coachMessageId, {
+              content: event.data.summary ?? 'Coach response ready.',
+              blocks: event.data.blocks ?? [],
+            });
+            receivedFinal = true;
+            setLoading(false);
+          }
+        }
+      }
+
+      if (buffer.trim()) {
+        const event = JSON.parse(buffer) as { type?: string; text?: string; data?: { summary?: string; blocks?: [] } };
+        if (event.type === 'delta' && event.text) {
+          appendMessageContent(coachMessageId, event.text);
+        }
+        if (event.type === 'final' && event.data) {
+          updateMessage(coachMessageId, {
+            content: event.data.summary ?? 'Coach response ready.',
+            blocks: event.data.blocks ?? [],
+          });
+          receivedFinal = true;
+          setLoading(false);
+        }
+      }
+
+      if (!receivedFinal) {
+        setLoading(false);
+      }
+    } catch (err) {
+      setLoading(false);
+      setError('Coach response failed. Please retry.');
+    }
   };
 
   const handleCheckInSubmit = async () => {

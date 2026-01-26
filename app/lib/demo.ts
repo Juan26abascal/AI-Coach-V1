@@ -17,8 +17,10 @@ export function generateStarterPlan(athlete: Athlete): TrainingPlan {
   return {
     id: crypto.randomUUID(),
     weekOf: new Date().toISOString(),
+    lastUpdated: new Date().toISOString(),
     days,
     nextSession: days[1],
+    nextSessionRationale: `Base week built around ${athlete.daysPerWeek} run days for steady aerobic progress.`,
   };
 }
 
