@@ -76,7 +76,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         hydrated: true,
       });
     } catch (err) {
-      set({ loading: false, error: 'Unable to load athlete data.' });
+      set({ loading: false, error: 'Unable to load athlete data.', hydrated: true });
     }
   },
   completeOnboarding: async (payload) => {
