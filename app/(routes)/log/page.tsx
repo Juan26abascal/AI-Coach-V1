@@ -14,10 +14,9 @@ export default function LogPage() {
   const { workouts, addWorkout, loading, error, offline } = useAppStore();
   const [form, setForm] = useState({ title: '', durationMinutes: 30, effort: 'Easy', pain: '', notes: '' });
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.title.trim()) return;
-    addWorkout({
-      id: crypto.randomUUID(),
+    await addWorkout({
       date: new Date().toISOString(),
       title: form.title,
       durationMinutes: form.durationMinutes,

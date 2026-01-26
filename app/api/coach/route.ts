@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { generateCoachResponse } from '@/lib/coach/service';
 import { CoachResponseSchema } from '@/lib/coach/schema';
 import type { CoachBlock } from '@/types';
+import { requireSessionUser } from '@/lib/auth';
 
 function buildBlocks(summary: string, prescription: string, integrationNote: string): CoachBlock[] {
   const normalizeBullets = (value: string) =>
@@ -28,6 +29,7 @@ function buildBlocks(summary: string, prescription: string, integrationNote: str
 
 export async function POST(request: Request) {
   try {
+    requireSessionUser();
     const body = await request.json();
     const message = typeof body?.message === 'string' ? body.message.trim() : '';
 
@@ -47,6 +49,9 @@ export async function POST(request: Request) {
       blocks: buildBlocks(validated.summary, validated.prescription, validated.integrationNote),
     });
   } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+    }
     return NextResponse.json({ error: 'Coach response failed.' }, { status: 500 });
   }
 }

@@ -18,7 +18,8 @@ const steps = [
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const setAthlete = useAppStore((state) => state.setAthlete);
+  const completeOnboarding = useAppStore((state) => state.completeOnboarding);
+  const loading = useAppStore((state) => state.loading);
   const [stepIndex, setStepIndex] = useState(0);
   const [form, setForm] = useState({
     name: '',
@@ -31,14 +32,13 @@ export default function OnboardingPage() {
 
   const current = steps[stepIndex];
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (stepIndex < steps.length - 1) {
       setStepIndex(stepIndex + 1);
       return;
     }
 
-    setAthlete({
-      id: crypto.randomUUID(),
+    await completeOnboarding({
       name: form.name || 'Runner',
       goal: form.goal || 'Consistency and speed',
       daysPerWeek: Number(form.daysPerWeek) || 4,
@@ -82,7 +82,9 @@ export default function OnboardingPage() {
           <Button variant="secondary" onClick={() => setStepIndex(Math.max(stepIndex - 1, 0))}>
             Back
           </Button>
-          <Button onClick={handleNext}>{stepIndex === steps.length - 1 ? 'Finish' : 'Next'}</Button>
+          <Button onClick={handleNext} disabled={loading}>
+            {stepIndex === steps.length - 1 ? 'Finish' : 'Next'}
+          </Button>
         </div>
       </Card>
     </div>
