@@ -28,16 +28,17 @@ export default function ChatPage() {
     setError,
     addCheckIn,
     clearError,
+    hydrated,
   } = useAppStore();
   const [draft, setDraft] = useState('');
   const [showAll, setShowAll] = useState(false);
   const [checkIn, setCheckIn] = useState({ readiness: 3, soreness: 2, sleep: 3, motivation: 4, note: '' });
 
   useEffect(() => {
-    if (!athlete) {
+    if (hydrated && !athlete) {
       router.replace('/onboarding');
     }
-  }, [athlete, router]);
+  }, [athlete, hydrated, router]);
 
   const visibleMessages = useMemo(() => {
     if (showAll) return messages;

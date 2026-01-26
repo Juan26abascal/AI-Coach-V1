@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Effort {
+  Easy
+  Moderate
+  Hard
+}
+
+enum MessageRole {
+  coach
+  user
+}
+
+model Athlete {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  name              String
+  goal              String
+  daysPerWeek        Int
+  pr5k              String?
+  pr10k             String?
+  injuryHistory     String
+  availabilityNotes String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model TrainingPlan {
+  id          String   @id @default(cuid())
+  userId      String
+  weekOf      DateTime
+  days        Json
+  nextSession Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Workout {
+  id              String   @id @default(cuid())
+  userId          String
+  date            DateTime
+  title           String
+  durationMinutes Int
+  effort          Effort
+  notes           String?
+  pain            String?
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+}
+
+model CheckIn {
+  id         String   @id @default(cuid())
+  userId     String
+  readiness  Int
+  soreness   Int
+  sleep      Int
+  motivation Int
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Message {
+  id        String      @id @default(cuid())
+  userId    String
+  role      MessageRole
+  content   String
+  blocks    Json?
+  createdAt DateTime    @default(now())
+
+  @@index([userId])
+}

@@ -10,10 +10,10 @@ import { useAppStore } from '@/store/useAppStore';
 
 export default function PlanPage() {
   useNetwork();
-  const { plan, loading, error, offline } = useAppStore();
+  const { plan, loading, error, offline, hydrated } = useAppStore();
   const [selectedDay, setSelectedDay] = useState(0);
 
-  if (!plan && loading) {
+  if (!hydrated && loading) {
     return (
       <Card>
         <p className="text-sm text-stone/70">Generating your weekly plan…</p>
