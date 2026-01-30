@@ -1,15 +1,49 @@
 import { NextResponse } from 'next/server';
-import { CoachResponseSchema, coachResponseJsonSchema, type CoachResponse } from '@/lib/coach/schema';
 import { getOpenAIClient } from '@/lib/openaiClient';
-import { COACH_DEVELOPER_PROMPT, COACH_SYSTEM_PROMPT } from '@/lib/coach/prompt';
+import { requireSessionUser } from '@/lib/auth';
+import { buildFileSearchTool, hasFileSearchResults, VECTOR_STORE_ID } from '@/lib/openai';
 import {
+  buildFullPrompt,
+  computeAthleteState,
   deriveSafetyFlags,
   fallbackCoachResponse,
   finalizeCoachResponse,
-  type CoachRequestContext,
-} from '@/lib/coach/guardrails';
-import type { CoachBlock } from '@/types';
-import { requireSessionUser } from '@/lib/auth';
+  formatDecisionGatesForPrompt,
+  formatStateForPrompt,
+  parseCoachResponse,
+  runDecisionGates,
+  type ConversationMessage,
+} from '@/lib/coach';
+import type { CoachBlock, ChatMessage } from '@/types';
+
+type RateLimitEntry = {
+  count: number;
+  resetAt: number;
+};
+
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 20;
+const rateLimitStore = new Map<string, RateLimitEntry>();
+
+function getClientId(request: Request): string {
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'anonymous'
+  );
+}
+
+function isRateLimited(clientId: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitStore.get(clientId);
+  if (!entry || now > entry.resetAt) {
+    rateLimitStore.set(clientId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+  entry.count += 1;
+  if (entry.count > RATE_LIMIT_MAX) return true;
+  return false;
+}
 
 function buildBlocks(summary: string, prescription: string, integrationNote: string): CoachBlock[] {
   const normalizeBullets = (value: string) =>
@@ -34,248 +68,104 @@ function buildBlocks(summary: string, prescription: string, integrationNote: str
   ];
 }
 
-function formatContext(context?: CoachRequestContext): string {
-  if (!context) return 'No additional context provided.';
-
-  const { athlete, plan, workouts, checkIns, recentMessages } = context;
-
-  const lines: string[] = [];
-
-  if (athlete) {
-    lines.push(`Athlete: ${athlete.name}. Goal: ${athlete.goal}. Days/week: ${athlete.daysPerWeek}. PR5K: ${athlete.pr5k ?? 'n/a'}. PR10K: ${athlete.pr10k ?? 'n/a'}. Injury history: ${athlete.injuryHistory}. Availability: ${athlete.availabilityNotes ?? 'n/a'}.`);
-  }
-
-  if (plan) {
-    lines.push(`Plan week of ${plan.weekOf}. Next session: ${plan.nextSession?.title ?? 'n/a'} - ${plan.nextSession?.details ?? ''}.`);
-  }
-
-  if (workouts?.length) {
-    const recent = workouts.slice(0, 5).map((workout) => `${workout.date}: ${workout.title} (${workout.durationMinutes} min, ${workout.effort}). Notes: ${workout.notes ?? 'n/a'}. Pain: ${workout.pain ?? 'n/a'}.`);
-    lines.push(`Recent workouts: ${recent.join(' | ')}`);
-  }
-
-  if (checkIns?.length) {
-    const latest = checkIns[0];
-    lines.push(`Latest check-in: readiness ${latest.readiness}/5, soreness ${latest.soreness}/5, sleep ${latest.sleep}/5, motivation ${latest.motivation}/5. Note: ${latest.note ?? 'n/a'}.`);
-  }
-
-  if (recentMessages?.length) {
-    const recent = recentMessages.slice(-6).map((message) => `${message.role}: ${message.content}`);
-    lines.push(`Recent chat: ${recent.join(' | ')}`);
-  }
-
-  return lines.length ? lines.join('\n') : 'No additional context provided.';
+function toChatMessages(conversationHistory?: ConversationMessage[]): ChatMessage[] {
+  if (!conversationHistory?.length) return [];
+  return conversationHistory.map((message, index) => ({
+    id: `history-${index}`,
+    role: message.role === 'assistant' || message.role === 'coach' ? 'coach' : 'user',
+    content: message.content,
+    createdAt: new Date().toISOString(),
+  }));
 }
 
-type SummaryStreamState = {
-  keyIndex: number;
-  foundKey: boolean;
-  seenColon: boolean;
-  inString: boolean;
-  escaped: boolean;
-  done: boolean;
-};
-
-const SUMMARY_KEY = '"summary"';
-
-function decodeEscapedChar(char: string): string {
-  switch (char) {
-    case 'n':
-      return '\n';
-    case 't':
-      return '\t';
-    case 'r':
-      return '\r';
-    case '"':
-      return '"';
-    case '\\':
-      return '\\';
-    default:
-      return char;
-  }
-}
-
-function extractSummaryDelta(state: SummaryStreamState, delta: string): string {
-  let output = '';
-
-  for (const char of delta) {
-    if (state.done) break;
-
-    if (!state.foundKey) {
-      if (char === SUMMARY_KEY[state.keyIndex]) {
-        state.keyIndex += 1;
-        if (state.keyIndex === SUMMARY_KEY.length) {
-          state.foundKey = true;
-        }
-      } else {
-        state.keyIndex = char === SUMMARY_KEY[0] ? 1 : 0;
-      }
-      continue;
-    }
-
-    if (!state.seenColon) {
-      if (char === ':') {
-        state.seenColon = true;
-      }
-      continue;
-    }
-
-    if (!state.inString) {
-      if (char === '"') {
-        state.inString = true;
-      }
-      continue;
-    }
-
-    if (state.escaped) {
-      output += decodeEscapedChar(char);
-      state.escaped = false;
-      continue;
-    }
-
-    if (char === '\\') {
-      state.escaped = true;
-      continue;
-    }
-
-    if (char === '"') {
-      state.done = true;
-      state.inString = false;
-      continue;
-    }
-
-    output += char;
-  }
-
-  return output;
-}
-
-function parseCoachResponse(outputText: string | null): CoachResponse | null {
-  if (!outputText) return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(outputText);
-  } catch (error) {
-    return null;
-  }
-
-  const result = CoachResponseSchema.safeParse(parsed);
-  return result.success ? result.data : null;
+function normalizeConversationHistory(conversationHistory?: ConversationMessage[]) {
+  return (conversationHistory ?? []).map((message) => ({
+    role: message.role === 'coach' ? 'assistant' : message.role,
+    content: message.content,
+  }));
 }
 
 export async function POST(request: Request) {
   try {
     requireSessionUser();
+    const clientId = getClientId(request);
+    if (isRateLimited(clientId)) {
+      return NextResponse.json({ error: 'Rate limit exceeded.' }, { status: 429 });
+    }
+
     const body = await request.json();
     const message = typeof body?.message === 'string' ? body.message.trim() : '';
+    const conversationHistory = Array.isArray(body?.conversationHistory)
+      ? (body.conversationHistory as ConversationMessage[])
+      : undefined;
 
     if (!message) {
       return NextResponse.json({ error: 'Message is required.' }, { status: 400 });
     }
 
-    const safety = deriveSafetyFlags(message, body?.context);
-    const encoder = new TextEncoder();
-
-    const stream = new ReadableStream({
-      async start(controller) {
-        const summaryState: SummaryStreamState = {
-          keyIndex: 0,
-          foundKey: false,
-          seenColon: false,
-          inString: false,
-          escaped: false,
-          done: false,
-        };
-        let fullText = '';
-
-        try {
-          const openai = getOpenAIClient();
-          const model = process.env.OPENAI_MODEL ?? 'gpt-4.1-mini';
-          const vectorStoreId = process.env.OPENAI_VECTOR_STORE_ID;
-
-          if (!process.env.OPENAI_API_KEY) {
-            throw new Error('Missing OPENAI_API_KEY.');
-          }
-
-          if (!vectorStoreId) {
-            throw new Error('Missing OPENAI_VECTOR_STORE_ID.');
-          }
-
-          const response = await openai.responses.stream({
-            model,
-            input: [
-              { role: 'system', content: COACH_SYSTEM_PROMPT },
-              { role: 'developer', content: COACH_DEVELOPER_PROMPT },
-              {
-                role: 'user',
-                content: `User request: ${message}\n\nContext:\n${formatContext(body?.context)}`,
-              },
-            ],
-            tools: [
-              {
-                type: 'file_search',
-                vector_store_ids: [vectorStoreId],
-                max_num_results: 4,
-              },
-            ],
-            response_format: {
-              type: 'json_schema',
-              json_schema: {
-                name: 'coach_response',
-                strict: true,
-                schema: coachResponseJsonSchema,
-              },
-            },
-          });
-
-          for await (const event of response) {
-            if (event.type !== 'response.output_text.delta') continue;
-            const delta = event.delta ?? '';
-            fullText += delta;
-            const summaryDelta = extractSummaryDelta(summaryState, delta);
-            if (summaryDelta) {
-              controller.enqueue(
-                encoder.encode(JSON.stringify({ type: 'delta', text: summaryDelta }) + '\n')
-              );
-            }
-          }
-
-          const finalResponse = await response.finalResponse();
-          const outputText = finalResponse.output_text ?? fullText;
-          const parsed = parseCoachResponse(outputText);
-          const validated = parsed ? finalizeCoachResponse(parsed, safety) : fallbackCoachResponse(safety);
-          const blocks = buildBlocks(
-            validated.summary,
-            validated.prescription,
-            validated.integrationNote
-          );
-
-          controller.enqueue(
-            encoder.encode(JSON.stringify({ type: 'final', data: { ...validated, blocks } }) + '\n')
-          );
-        } catch (error) {
-          const fallback = fallbackCoachResponse(safety);
-          const blocks = buildBlocks(
-            fallback.summary,
-            fallback.prescription,
-            fallback.integrationNote
-          );
-          controller.enqueue(
-            encoder.encode(JSON.stringify({ type: 'final', data: { ...fallback, blocks } }) + '\n')
-          );
-        } finally {
-          controller.close();
-        }
-      },
+    const safety = deriveSafetyFlags(message, {
+      recentMessages: toChatMessages(conversationHistory),
     });
 
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'application/x-ndjson; charset=utf-8',
-        'Cache-Control': 'no-cache, no-transform',
-        Connection: 'keep-alive',
-      },
-    });
+    console.info('coach: computing athlete state');
+    const athleteState = computeAthleteState(message, conversationHistory);
+    console.info('coach: running decision gates');
+    const decisionGates = runDecisionGates(athleteState);
+    const stateText = formatStateForPrompt(athleteState);
+    const gatesText = formatDecisionGatesForPrompt(decisionGates);
+    const fullPrompt = buildFullPrompt(stateText, gatesText);
+
+    try {
+      const openai = getOpenAIClient();
+      const model = process.env.OPENAI_MODEL ?? 'gpt-4.1-mini';
+      if (!process.env.OPENAI_API_KEY) {
+        throw new Error('Missing OPENAI_API_KEY.');
+      }
+
+      if (!VECTOR_STORE_ID) {
+        console.warn('coach: missing vector store id, skipping file search');
+      }
+
+      console.info('coach: requesting OpenAI response');
+      const fileSearchTool = buildFileSearchTool();
+      const responseStream = await openai.responses.stream({
+        model,
+        input: [
+          { role: 'system', content: fullPrompt },
+          ...normalizeConversationHistory(conversationHistory),
+          { role: 'user', content: message },
+        ],
+        tools: fileSearchTool ? [fileSearchTool] : undefined,
+        tool_choice: 'auto',
+        max_tokens: 1000,
+      });
+
+      let outputText = '';
+      for await (const event of responseStream) {
+        if (event.type !== 'response.output_text.delta') continue;
+        outputText += event.delta ?? '';
+      }
+
+      const finalResponse = await responseStream.finalResponse();
+      if (!hasFileSearchResults(finalResponse)) {
+        console.info('coach: file search returned no results');
+      }
+
+      const parsed = parseCoachResponse(finalResponse.output_text ?? outputText);
+      const validated = parsed ? finalizeCoachResponse(parsed, safety) : fallbackCoachResponse(safety);
+      const blocks = buildBlocks(
+        validated.summary,
+        validated.prescription,
+        validated.integrationNote
+      );
+
+      return NextResponse.json({ ...validated, blocks });
+    } catch (error) {
+      console.error('coach: OpenAI request failed', error);
+      const fallback = fallbackCoachResponse(safety);
+      const blocks = buildBlocks(fallback.summary, fallback.prescription, fallback.integrationNote);
+      return NextResponse.json({ ...fallback, blocks }, { status: 200 });
+    }
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
