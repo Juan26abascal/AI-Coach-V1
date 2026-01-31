@@ -1,3 +1,4 @@
+import 'server-only';
 import OpenAI from 'openai';
 
 function requiredEnv(name: string): string {
@@ -7,10 +8,9 @@ function requiredEnv(name: string): string {
 }
 
 export function getOpenAIClient() {
-  // OPENAI_API_KEY is required.
+  // Correct: pass the ENV VAR NAME, not the secret itself
   const apiKey = requiredEnv('OPENAI_API_KEY');
 
-  // Optional org/project scoping (useful when you have multiple).
   const organization = process.env.OPENAI_ORG_ID;
   const project = process.env.OPENAI_PROJECT_ID;
 
@@ -18,6 +18,7 @@ export function getOpenAIClient() {
 }
 
 export function getVectorStoreId() {
+  // Correct: pass the ENV VAR NAME, not the "vs_..." value
   return requiredEnv('OPENAI_VECTOR_STORE_ID');
 }
 

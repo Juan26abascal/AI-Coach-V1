@@ -1,11 +1,20 @@
 import clsx from 'clsx';
+import ActionButtons from './ActionButtons';
+import AlertCard from './AlertCard';
+import WorkoutCard from './WorkoutCard';
+import type { Message } from '@/types';
 
 type MessageBubbleProps = {
-  children: React.ReactNode;
+  message: Message;
   tone: 'coach' | 'user';
+  onAction?: (value: string) => void;
 };
 
-export default function MessageBubble({ children, tone }: MessageBubbleProps) {
+export default function MessageBubble({ message, tone, onAction }: MessageBubbleProps) {
+  const handleAction = (value: string) => {
+    onAction?.(value);
+  };
+
   return (
     <div
       className={clsx(
@@ -15,7 +24,19 @@ export default function MessageBubble({ children, tone }: MessageBubbleProps) {
           : 'ml-auto bg-sand text-ink'
       )}
     >
-      {children}
+      <div className="space-y-4">
+        <p className="text-sm leading-relaxed">{message.content}</p>
+
+        {message.structuredContent?.session && (
+          <WorkoutCard session={message.structuredContent.session} />
+        )}
+
+        {message.structuredContent?.alert && <AlertCard alert={message.structuredContent.alert} />}
+
+        {message.structuredContent?.actions && message.structuredContent.actions.length > 0 && (
+          <ActionButtons actions={message.structuredContent.actions} onAction={handleAction} />
+        )}
+      </div>
     </div>
   );
 }
