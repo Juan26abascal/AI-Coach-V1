@@ -20,7 +20,12 @@
     "baseUrl": ".",
     "paths": {
       "@/*": [
+<<<<<<< HEAD
         "./app/*"
+=======
+        "./app/*",
+        "./src/*"
+>>>>>>> origin/main
       ]
     },
     "plugins": [

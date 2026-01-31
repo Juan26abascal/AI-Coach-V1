@@ -1,9 +1,8 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import AppShell from '@/components/AppShell';
-
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+import AuthProvider from '@/components/AuthProvider';
+import { getSessionUser } from '@/lib/auth';
 
 export const metadata: Metadata = {
   title: 'AI Running Coach',
@@ -11,10 +10,13 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const user = getSessionUser();
   return (
-    <html lang="en" className={inter.variable}>
-      <body className="min-h-screen bg-ink text-stone">
-        <AppShell>{children}</AppShell>
+    <html lang="en">
+      <body className="min-h-screen bg-ink text-stone font-sans">
+        <AuthProvider initialUser={user}>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
       </body>
     </html>
   );
