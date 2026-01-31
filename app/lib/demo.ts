@@ -1,4 +1,5 @@
-import type { Athlete, TrainingPlan, ChatMessage } from '@/types';
+import type { Athlete, TrainingPlan, Message } from '@/types';
+import type { CoachResponse, SessionPrescription } from '@/lib/coach/types';
 
 export function generateStarterPlan(athlete: Athlete): TrainingPlan {
   const days = Array.from({ length: 7 }, (_, index) => {
@@ -24,26 +25,44 @@ export function generateStarterPlan(athlete: Athlete): TrainingPlan {
   };
 }
 
-export function generateWelcomeMessages(athlete: Athlete, plan: TrainingPlan): ChatMessage[] {
+export function generateWelcomeMessages(athlete: Athlete, plan: TrainingPlan): Message[] {
   return [
     {
       id: crypto.randomUUID(),
-      role: 'coach',
+      role: 'assistant',
       content: `Welcome, ${athlete.name}. I built your first week around ${athlete.daysPerWeek} run days. We’ll adjust based on your feedback.`,
-      createdAt: new Date().toISOString(),
+      timestamp: new Date().toISOString(),
     },
     {
       id: crypto.randomUUID(),
-      role: 'coach',
+      role: 'assistant',
       content: 'Your next session is ready. Keep it conversational and smooth.',
-      createdAt: new Date().toISOString(),
-      blocks: [
-        {
-          title: 'Next session',
-          bullets: [plan.nextSession?.details ?? '35–40 min easy', '4 x 20s strides'],
-          note: 'Fresh legs matter more than speed right now.',
-        },
-      ],
+      timestamp: new Date().toISOString(),
+      structuredContent: {
+        message: 'Here are the details for the next key session.',
+        confidence: 'high',
+        session: {
+          type: 'long',
+          title: plan.nextSession?.title ?? 'Long aerobic run',
+          warmup: {
+            duration: '10 min',
+            description: 'Easy spin with 2 x 20s strides to open the hips.',
+          },
+          main: {
+            structure: '4 x 12 min steady with 2 min jog recoveries',
+            target: 'Hold comfortably hard, ~30s slower than 5K pace',
+            recovery: '2 min easy jog',
+            notes: plan.nextSession?.focus ?? 'Stay smooth, keep cadence high.',
+          },
+          cooldown: {
+            duration: '8 min',
+            description: 'Cruise back with easy jogging and a few stretch strides.',
+          },
+          totalTime: '55 min',
+          totalDistance: '7.0 miles',
+          calibration: 'If today feels heavy, back off 10–15 sec per mile for the first half.',
+        } satisfies SessionPrescription,
+      } satisfies CoachResponse,
     },
   ];
 }

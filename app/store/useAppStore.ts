@@ -37,7 +37,7 @@ async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error?.error || 'Request failed.');
+    throw new Error((error as { error?: string })?.error || 'Request failed.');
   }
   return response.json();
 }
@@ -75,7 +75,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         error: null,
         hydrated: true,
       });
-    } catch (err) {
+    } catch {
       set({ loading: false, error: 'Unable to load athlete data.', hydrated: true });
     }
   },
@@ -102,7 +102,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         error: null,
         hydrated: true,
       });
-    } catch (err) {
+    } catch {
       set({ loading: false, error: 'Unable to save onboarding profile.' });
     }
   },
@@ -114,7 +114,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         body: JSON.stringify(athlete),
       });
       set({ athlete: data.athlete, loading: false, error: null });
-    } catch (err) {
+    } catch {
       set({ loading: false, error: 'Could not update athlete profile.' });
     }
   },
@@ -126,7 +126,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         body: JSON.stringify(workout),
       });
       set((state) => ({ workouts: [data.workout, ...state.workouts], loading: false, error: null }));
-    } catch (err) {
+    } catch {
       set({ loading: false, error: 'Workout could not be saved.' });
     }
   },
@@ -138,7 +138,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         body: JSON.stringify(plan),
       });
       set({ plan: data.plan, loading: false, error: null });
-    } catch (err) {
+    } catch {
       set({ loading: false, error: 'Plan update failed.' });
     }
   },
@@ -149,7 +149,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         body: JSON.stringify(message),
       });
       set((state) => ({ messages: [...state.messages, data.message] }));
-    } catch (err) {
+    } catch {
       set({ error: 'Message could not be saved.' });
     }
   },
@@ -196,8 +196,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         method: 'POST',
         body: JSON.stringify({
           role: 'coach',
-          content: data.summary ?? 'Coach response ready.',
-          blocks: data.blocks ?? [],
+          content: (data as { summary?: string }).summary ?? 'Coach response ready.',
+          blocks: (data as { blocks?: unknown[] }).blocks ?? [],
         }),
       });
 
@@ -206,7 +206,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         loading: false,
         error: null,
       });
-    } catch (err) {
+    } catch {
       set({ loading: false, error: 'Coach response failed. Please retry.' });
     }
   },
@@ -251,8 +251,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         method: 'POST',
         body: JSON.stringify({
           role: 'coach',
-          content: response.summary ?? 'Coach response ready.',
-          blocks: response.blocks ?? [],
+          content: (response as { summary?: string }).summary ?? 'Coach response ready.',
+          blocks: (response as { blocks?: unknown[] }).blocks ?? [],
         }),
       });
 
@@ -261,7 +261,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         loading: false,
         error: null,
       }));
-    } catch (err) {
+    } catch {
       set({ loading: false, error: 'Coach could not review the check-in.' });
     }
   },

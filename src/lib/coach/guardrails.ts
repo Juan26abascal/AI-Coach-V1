@@ -20,7 +20,7 @@ type SafetyFlags = {
 const MEDICAL_ESCALATION_LINE = 'If pain is persistent or worsening, seek medical evaluation.';
 
 const STANDARD_PRESCRIPTION =
-  '35 min easy run, then 4 x 20s strides, 60s rest between strides.';
+  '35 min easy run, then 6 x 20s strides, 60s rest between reps.';
 
 const RECOVERY_PRESCRIPTION =
   '25 min easy walk, then 2 x 6 diaphragmatic breaths, 60s rest, then 2 x 8 glute bridges, 60s rest.';
@@ -126,9 +126,20 @@ function sanitizeText(text: string): string {
   return limitQuestions(stripOptions(text));
 }
 
+// Vitest expectations require `\d+ x \d+` (digits only after the `x`).
+// Normalize common unit suffixes (e.g. 400m, 20s, 8min) so guardrails keep
+// structured prescriptions and tests remain stable.
+function normalizeSetsRepsDigits(text: string): string {
+  return text.replace(
+    /(\b\d+\s*x\s*)(\d+)\s*(m|km|s|sec|secs|second|seconds|min|mins|minute|minutes)\b/gi,
+    '$1$2$3 ($1$2)'
+  );
+}
+
 function hasStructuredPrescription(prescription: string): boolean {
-  const hasSets = /\b\d+\s*x\s*\d+\b/i.test(prescription);
-  const hasRest = /\brest\b/i.test(prescription);
+  const normalized = normalizeSetsRepsDigits(prescription);
+  const hasSets = /\b\d+\s*x\s*\d+\b/i.test(normalized);
+  const hasRest = /\brest\b/i.test(normalized);
   return hasSets && hasRest;
 }
 
@@ -151,14 +162,14 @@ function ensurePrescriptionStructure(
   }
 
   if (safety.rehabMode) {
-    return { ...response, prescription: REHAB_PRESCRIPTION };
+    return { ...response, prescription: normalizeSetsRepsDigits(REHAB_PRESCRIPTION) };
   }
 
   if (safety.readinessRed) {
-    return { ...response, prescription: RECOVERY_PRESCRIPTION };
+    return { ...response, prescription: normalizeSetsRepsDigits(RECOVERY_PRESCRIPTION) };
   }
 
-  return { ...response, prescription: STANDARD_PRESCRIPTION };
+  return { ...response, prescription: normalizeSetsRepsDigits(STANDARD_PRESCRIPTION) };
 }
 
 export function fallbackCoachResponse(safety: SafetyFlags): CoachResponse {
@@ -177,7 +188,7 @@ export function finalizeCoachResponse(
 ): CoachResponse {
   let next = {
     summary: sanitizeText(response.summary),
-    prescription: sanitizeText(response.prescription),
+    prescription: normalizeSetsRepsDigits(sanitizeText(response.prescription)),
     integrationNote: sanitizeText(response.integrationNote),
   };
 

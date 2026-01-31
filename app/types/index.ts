@@ -1,3 +1,5 @@
+import type { CoachResponse } from '@/lib/coach/types';
+
 export type Athlete = {
   id: string;
   name: string;
@@ -34,19 +36,15 @@ export type Workout = {
   pain?: string;
 };
 
-export type ChatMessage = {
+export interface Message {
   id: string;
-  role: 'coach' | 'user';
+  role: 'user' | 'assistant';
   content: string;
-  createdAt: string;
-  blocks?: CoachBlock[];
-};
+  structuredContent?: CoachResponse;
+  timestamp: string;
+}
 
-export type CoachBlock = {
-  title: string;
-  bullets: string[];
-  note?: string;
-};
+export type ChatMessage = Message;
 
 export type CheckIn = {
   readiness: number;

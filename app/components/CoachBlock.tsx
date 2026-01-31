@@ -1,24 +1,28 @@
+import AlertCard from './AlertCard';
+import WorkoutCard from './WorkoutCard';
+import ActionButtons from './ActionButtons';
 import Card from '@/components/Card';
+import type { CoachResponse } from '@/lib/coach/types';
 
 type CoachBlockProps = {
-  title: string;
-  bullets: string[];
-  note?: string;
+  response: CoachResponse;
+  onAction?: (value: string) => void;
 };
 
-export default function CoachBlock({ title, bullets, note }: CoachBlockProps) {
+export default function CoachBlock({ response, onAction }: CoachBlockProps) {
   return (
-    <Card className="space-y-3">
-      <h4 className="text-sm font-semibold text-sand">{title}</h4>
-      <ul className="space-y-2 text-sm text-stone/80">
-        {bullets.map((bullet) => (
-          <li key={bullet} className="flex gap-3">
-            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-sand/60" />
-            <span>{bullet}</span>
-          </li>
-        ))}
-      </ul>
-      {note && <p className="text-xs text-stone/60">{note}</p>}
-    </Card>
+    <div className="space-y-4">
+      <Card className="space-y-3">
+        <p className="text-sm text-stone/80">{response.message}</p>
+      </Card>
+
+      {response.session && <WorkoutCard session={response.session} />}
+      {response.alert && <AlertCard alert={response.alert} />}
+      {response.actions && response.actions.length > 0 && (
+        <Card className="space-y-3">
+          <ActionButtons actions={response.actions} onAction={onAction} />
+        </Card>
+      )}
+    </div>
   );
 }

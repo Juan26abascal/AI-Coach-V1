@@ -3,7 +3,7 @@ import type { ChatMessage } from '@/types';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function getMockCoachResponse(input: string, state: AppState): Promise<ChatMessage> {
+export async function getMockCoachResponse(input: string, _state: AppState): Promise<ChatMessage> {
   await delay(600);
 
   const lower = input.toLowerCase();

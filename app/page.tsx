@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
-import CoachBlock from '@/components/CoachBlock';
 import MessageBubble from '@/components/MessageBubble';
 import Input from '@/components/Input';
 import Chip from '@/components/Chip';
@@ -44,6 +43,10 @@ export default function ChatPage() {
     if (showAll) return messages;
     return messages.slice(-40);
   }, [messages, showAll]);
+
+  const handleAction = (value: string) => {
+    console.log('Action selected:', value);
+  };
 
   const handleSend = async () => {
     if (!draft.trim()) return;
@@ -224,19 +227,27 @@ export default function ChatPage() {
 
         <div className="flex flex-col gap-4">
           {visibleMessages.map((message) => (
-            <div key={message.id} className={clsx('flex', message.role === 'user' ? 'justify-end' : 'justify-start')}>
-              <div className="space-y-3">
-                <MessageBubble tone={message.role}>{message.content}</MessageBubble>
-                {message.blocks?.map((block) => (
-                  <CoachBlock key={block.title} {...block} />
-                ))}
-              </div>
+            <div
+              key={message.id}
+              className={clsx('flex', message.role === 'user' ? 'justify-end' : 'justify-start')}
+            >
+              <MessageBubble
+                tone={message.role === 'assistant' ? 'coach' : 'user'}
+                message={message}
+                onAction={handleAction}
+              />
             </div>
           ))}
           {loading && (
-            <MessageBubble tone="coach">
-              <span className="text-stone/70">Coach is thinking…</span>
-            </MessageBubble>
+            <MessageBubble
+              tone="coach"
+              message={{
+                id: 'loading',
+                role: 'assistant',
+                content: 'Coach is thinking…',
+                timestamp: new Date().toISOString(),
+              }}
+            />
           )}
         </div>
       </section>
