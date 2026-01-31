@@ -1,15 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-<<<<<<< HEAD
-import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Athlete, TrainingPlan, Workout, Message, CheckIn } from '@/types';
-import { getMockCoachResponse } from '@/lib/coach';
-import { generateStarterPlan, generateWelcomeMessages } from '@/lib/demo';
-import type { CoachResponse } from '@/lib/coach/types';
-=======
 import type { Athlete, TrainingPlan, Workout, ChatMessage, CheckIn } from '@/types';
->>>>>>> origin/main
 
 type OnboardingPayload = Omit<Athlete, 'id'>;
 
@@ -17,21 +9,13 @@ type AppState = {
   athlete: Athlete | null;
   plan: TrainingPlan | null;
   workouts: Workout[];
-  messages: Message[];
+  messages: ChatMessage[];
   checkIns: CheckIn[];
   loading: boolean;
   error: string | null;
   offline: boolean;
   hydrated: boolean;
   setOffline: (offline: boolean) => void;
-<<<<<<< HEAD
-  setAthlete: (athlete: Athlete) => void;
-  updateAthlete: (athlete: Athlete) => void;
-  addWorkout: (workout: Workout) => void;
-  updatePlan: (plan: TrainingPlan) => void;
-  addMessage: (message: Message) => void;
-  sendMessage: (text: string) => Promise<void>;
-=======
   hydrate: () => Promise<void>;
   completeOnboarding: (payload: OnboardingPayload) => Promise<void>;
   updateAthlete: (athlete: Athlete) => Promise<void>;
@@ -39,108 +23,10 @@ type AppState = {
   updatePlan: (plan: TrainingPlan) => Promise<void>;
   addMessage: (message: Omit<ChatMessage, 'id'>) => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
->>>>>>> origin/main
   addCheckIn: (checkIn: CheckIn) => Promise<void>;
   clearError: () => void;
 };
 
-<<<<<<< HEAD
-export const useAppStore = create<AppState>()(
-  persist(
-    (set, get) => ({
-      athlete: null,
-      plan: null,
-      workouts: [],
-      messages: [],
-      checkIns: [],
-      loading: false,
-      error: null,
-      offline: false,
-      setOffline: (offline) => set({ offline }),
-      clearError: () => set({ error: null }),
-      setAthlete: (athlete) => {
-        const starterPlan = generateStarterPlan(athlete);
-        set({ athlete, plan: starterPlan, messages: generateWelcomeMessages(athlete, starterPlan) });
-      },
-      updateAthlete: (athlete) => set({ athlete }),
-      addWorkout: (workout) =>
-        set((state) => ({
-          workouts: [workout, ...state.workouts],
-        })),
-      updatePlan: (plan) => set({ plan }),
-      addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
-      sendMessage: async (text) => {
-        const { offline } = get();
-        const userMessage: Message = {
-          id: crypto.randomUUID(),
-          role: 'user',
-          content: text,
-          timestamp: new Date().toISOString(),
-        };
-        let conversationHistory: Message[] = [];
-        set((state) => {
-          const nextMessages = [...state.messages, userMessage];
-          conversationHistory = nextMessages;
-          return { messages: nextMessages, loading: true };
-        });
-
-        if (offline) {
-          set({ loading: false, error: 'You appear to be offline. Try again when connected.' });
-          return;
-        }
-
-        try {
-          const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              message: text,
-              conversationHistory,
-            }),
-          });
-
-          if (!response.ok) {
-            throw new Error('Failed to get coach response');
-          }
-
-          const coachResponse: CoachResponse = await response.json();
-          const coachMessage: Message = {
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: coachResponse.message,
-            timestamp: new Date().toISOString(),
-            structuredContent: coachResponse,
-          };
-
-          set((state) => ({
-            messages: [...state.messages, coachMessage],
-            loading: false,
-          }));
-        } catch (err) {
-          const errorMessage =
-            err instanceof Error ? err.message : 'Coach response failed. Please retry.';
-          set({ loading: false, error: errorMessage });
-        }
-      },
-      addCheckIn: async (checkIn) => {
-        const { offline } = get();
-        set((state) => ({ checkIns: [checkIn, ...state.checkIns], loading: true }));
-        if (offline) {
-          set({ loading: false, error: 'Check-in saved locally. Coach will sync later.' });
-          return;
-        }
-        try {
-          const response = await getMockCoachResponse('Daily check-in submitted', get());
-          set((state) => ({ messages: [...state.messages, response], loading: false }));
-        } catch (err) {
-          set({ loading: false, error: 'Coach could not review the check-in.' });
-        }
-      },
-    }),
-    {
-      name: 'ai-running-coach',
-      storage: createJSONStorage(() => localStorage),
-=======
 async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, {
     ...init,
@@ -151,7 +37,7 @@ async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error?.error || 'Request failed.');
+    throw new Error((error as { error?: string })?.error || 'Request failed.');
   }
   return response.json();
 }
@@ -189,9 +75,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         error: null,
         hydrated: true,
       });
-    } catch (err) {
+    } catch {
       set({ loading: false, error: 'Unable to load athlete data.', hydrated: true });
->>>>>>> origin/main
     }
   },
   completeOnboarding: async (payload) => {
@@ -217,7 +102,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         error: null,
         hydrated: true,
       });
-    } catch (err) {
+    } catch {
       set({ loading: false, error: 'Unable to save onboarding profile.' });
     }
   },
@@ -229,7 +114,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         body: JSON.stringify(athlete),
       });
       set({ athlete: data.athlete, loading: false, error: null });
-    } catch (err) {
+    } catch {
       set({ loading: false, error: 'Could not update athlete profile.' });
     }
   },
@@ -241,7 +126,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         body: JSON.stringify(workout),
       });
       set((state) => ({ workouts: [data.workout, ...state.workouts], loading: false, error: null }));
-    } catch (err) {
+    } catch {
       set({ loading: false, error: 'Workout could not be saved.' });
     }
   },
@@ -253,7 +138,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         body: JSON.stringify(plan),
       });
       set({ plan: data.plan, loading: false, error: null });
-    } catch (err) {
+    } catch {
       set({ loading: false, error: 'Plan update failed.' });
     }
   },
@@ -264,7 +149,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         body: JSON.stringify(message),
       });
       set((state) => ({ messages: [...state.messages, data.message] }));
-    } catch (err) {
+    } catch {
       set({ error: 'Message could not be saved.' });
     }
   },
@@ -311,8 +196,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         method: 'POST',
         body: JSON.stringify({
           role: 'coach',
-          content: data.summary ?? 'Coach response ready.',
-          blocks: data.blocks ?? [],
+          content: (data as { summary?: string }).summary ?? 'Coach response ready.',
+          blocks: (data as { blocks?: unknown[] }).blocks ?? [],
         }),
       });
 
@@ -321,7 +206,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         loading: false,
         error: null,
       });
-    } catch (err) {
+    } catch {
       set({ loading: false, error: 'Coach response failed. Please retry.' });
     }
   },
@@ -366,8 +251,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         method: 'POST',
         body: JSON.stringify({
           role: 'coach',
-          content: response.summary ?? 'Coach response ready.',
-          blocks: response.blocks ?? [],
+          content: (response as { summary?: string }).summary ?? 'Coach response ready.',
+          blocks: (response as { blocks?: unknown[] }).blocks ?? [],
         }),
       });
 
@@ -376,7 +261,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         loading: false,
         error: null,
       }));
-    } catch (err) {
+    } catch {
       set({ loading: false, error: 'Coach could not review the check-in.' });
     }
   },

@@ -4,7 +4,6 @@ node_modules/
 # Next.js
 .next/
 out/
-
 dist/
 
 # Environment files (never commit real secrets)
@@ -24,10 +23,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# OS / Editor
-.DS_Store
-
 # Vercel / Turborepo / build caches
 .vercel
 .turbo
 .swc
+
+# OS / Editor
+.DS_Store
