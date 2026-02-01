@@ -52,18 +52,27 @@ export interface StandardWorkoutCard {
 }
 
 // COMPLEX CARD
-export interface ComplexWorkoutCard extends StandardWorkoutCard {
+export interface ComplexWorkoutCard {
   type: 'speed' | 'track' | 'race';
+  title: string;
   warmup: {
     duration: string;
     description: string;
     drills?: string[];
+  };
+  main: {
+    structure: string;
+    target: string;
+    recovery: string;
+    notes?: string;
   };
   cooldown: {
     duration: string;
     description: string;
     stretches?: string[];
   };
+  totalTime: string;
+  totalDistance?: string;
   equipmentNeeded?: string[];
 }
 
@@ -141,6 +150,7 @@ export interface SessionPrescription {
   };
   totalTime: string;
   totalDistance?: string;
+  calibration?: string;
 }
 
 /**

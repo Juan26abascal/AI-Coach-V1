@@ -50,7 +50,7 @@ export async function getBootstrapData(userId: string) {
     .sort((a, b) => b.date.localeCompare(a.date));
   const messages = db.messages
     .filter((item) => item.userId === userId)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
   const checkIns = db.checkIns
     .filter((item) => item.userId === userId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -140,13 +140,13 @@ export async function addCheckIn(userId: string, input: Omit<CheckIn, 'createdAt
   return checkIn;
 }
 
-export async function addMessage(userId: string, input: Omit<ChatMessage, 'id' | 'createdAt'> & { createdAt?: string }) {
+export async function addMessage(userId: string, input: Omit<ChatMessage, 'id' | 'timestamp'> & { timestamp?: string }) {
   const db = await readDatabase();
   const message: MessageRecord = {
     id: randomUUID(),
     userId,
     ...input,
-    createdAt: input.createdAt ?? new Date().toISOString(),
+    timestamp: input.timestamp ?? new Date().toISOString(),
   };
   db.messages.push(message);
   await writeDatabase(db);

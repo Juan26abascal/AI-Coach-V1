@@ -13,10 +13,10 @@ export async function getMockCoachResponse(input: string, _state: AppState): Pro
   if (mentionsPain) {
     return {
       id: crypto.randomUUID(),
-      role: 'coach',
+      role: 'assistant',
       content:
         'Pause intensity today. If pain is sharp or worsening, stop and consider professional guidance. I can adapt your week once you tell me severity and location.',
-      createdAt: new Date().toISOString(),
+      timestamp: new Date().toISOString(),
       blocks: [
         {
           title: 'Immediate next steps',
@@ -34,9 +34,9 @@ export async function getMockCoachResponse(input: string, _state: AppState): Pro
   if (lower.includes('plan') || lower.includes('week')) {
     return {
       id: crypto.randomUUID(),
-      role: 'coach',
+      role: 'assistant',
       content: 'Your week stays simple: consistency, then quality. Here is the next key session.',
-      createdAt: new Date().toISOString(),
+      timestamp: new Date().toISOString(),
       blocks: [
         {
           title: 'Next key session',
@@ -49,9 +49,9 @@ export async function getMockCoachResponse(input: string, _state: AppState): Pro
 
   return {
     id: crypto.randomUUID(),
-    role: 'coach',
+    role: 'assistant',
     content:
       'Logged. Keep the notes honest — they help me adjust your plan with precision. Anything else I should know before the next session?',
-    createdAt: new Date().toISOString(),
+    timestamp: new Date().toISOString(),
   };
 }

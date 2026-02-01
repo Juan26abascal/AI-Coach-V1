@@ -27,6 +27,7 @@ pnpm-debug.log*
 .vercel
 .turbo
 .swc
+*.tsbuildinfo
 
 # OS / Editor
 .DS_Store

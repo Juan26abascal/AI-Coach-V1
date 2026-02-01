@@ -72,9 +72,9 @@ function toChatMessages(conversationHistory?: ConversationMessage[]): ChatMessag
   if (!conversationHistory?.length) return [];
   return conversationHistory.map((message, index) => ({
     id: `history-${index}`,
-    role: message.role === 'assistant' || message.role === 'coach' ? 'coach' : 'user',
+    role: message.role === 'assistant' ? 'assistant' : 'user',
     content: message.content,
-    createdAt: new Date().toISOString(),
+    timestamp: new Date().toISOString(),
   }));
 }
 

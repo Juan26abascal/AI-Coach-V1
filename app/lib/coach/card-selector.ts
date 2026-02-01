@@ -1,4 +1,4 @@
-import { SessionType, WorkoutCardType } from './types';
+import type { SessionType, WorkoutCardType, WorkoutCard } from './types';
 
 /**
  * Determines which workout card format to use based on session type
@@ -47,7 +47,7 @@ export function validateCardFormat(
       errors.push('Simple cards should not have cooldown section');
     }
     // Simple cards MUST have duration and effort
-    if (!card.duration) {
+    if (!('duration' in card) || !card.duration) {
       errors.push('Simple cards must have duration');
     }
     if (!('effort' in card)) {

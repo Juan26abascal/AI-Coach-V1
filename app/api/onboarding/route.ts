@@ -23,6 +23,7 @@ export async function POST(request: Request) {
     const starterPlan = generateStarterPlan(athlete);
     const plan = await savePlan(user.id, {
       weekOf: starterPlan.weekOf,
+      lastUpdated: starterPlan.lastUpdated,
       days: starterPlan.days,
       nextSession: starterPlan.nextSession,
     });
@@ -34,8 +35,7 @@ export async function POST(request: Request) {
       const created = await addMessage(user.id, {
         role: message.role,
         content: message.content,
-        blocks: message.blocks,
-        createdAt: message.createdAt,
+        timestamp: message.timestamp,
       });
       messages.push(created);
     }
