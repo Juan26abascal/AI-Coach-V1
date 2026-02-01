@@ -1,5 +1,5 @@
 import type { Athlete, TrainingPlan, Workout, CheckIn, ChatMessage } from '@/types';
-import { CoachResponseSchema, type CoachResponse } from '@/lib/coach/schema';
+import { CoachResponseSchema, type CoachResponse, type SessionPrescription } from '@/lib/coach/schema';
 
 export type CoachRequestContext = {
   athlete?: Athlete | null;
@@ -19,34 +19,67 @@ type SafetyFlags = {
 
 const MEDICAL_ESCALATION_LINE = 'If pain is persistent or worsening, seek medical evaluation.';
 
-const STANDARD_PRESCRIPTION =
-  '35 min easy run, then 6 x 20s strides, 60s rest between reps.';
+// Default sessions for different states
+const STANDARD_SESSION: SessionPrescription = {
+  type: 'easy',
+  title: 'Easy Run with Strides',
+  duration: '35 min',
+  effort: 'Conversational pace',
+  totalTime: '45 min',
+  warmup: {
+    duration: '10 min',
+    description: 'Easy jog',
+  },
+  main: {
+    structure: '20 min easy + 6 x 20s strides',
+    target: 'Conversational pace, strides at controlled fast',
+    recovery: '60s walk between strides',
+  },
+  cooldown: {
+    duration: '5 min',
+    description: 'Easy walk',
+  },
+};
 
-const RECOVERY_PRESCRIPTION =
-  '25 min easy walk, then 2 x 6 diaphragmatic breaths, 60s rest, then 2 x 8 glute bridges, 60s rest.';
+const RECOVERY_SESSION: SessionPrescription = {
+  type: 'recovery',
+  title: 'Recovery Walk & Prehab',
+  duration: '25 min',
+  effort: 'Very easy walk',
+  notes: 'Focus on gentle movement and breathing exercises.',
+  totalTime: '25 min',
+};
 
-const REHAB_PRESCRIPTION =
-  '20 min easy walk, then 2 x 8 glute bridges, 60s rest, then 2 x 8 calf raises, 60s rest.';
+const REHAB_SESSION: SessionPrescription = {
+  type: 'recovery',
+  title: 'Rehab Day',
+  duration: '20 min',
+  effort: 'Very easy walk only',
+  notes: 'No running today. Focus on gentle movement.',
+  totalTime: '20 min',
+};
 
 const STANDARD_RESPONSE: CoachResponse = {
-  summary: 'Here is a concise session aligned to your current plan focus.',
-  prescription: STANDARD_PRESCRIPTION,
-  integrationNote: 'Log RPE and any pain score tonight to calibrate the next session.',
+  message: 'Here is a session aligned to your current plan focus.',
+  session: STANDARD_SESSION,
+  confidence: 'high',
 };
 
 const RECOVERY_RESPONSE: CoachResponse = {
-  summary: 'Readiness is red, so today is recovery and prehab only.',
-  prescription: RECOVERY_PRESCRIPTION,
-  integrationNote: 'Keep it gentle and note how you feel within two hours post-session.',
+  message: 'Readiness is low today. Recovery and prehab only.',
+  session: RECOVERY_SESSION,
+  confidence: 'high',
 };
 
 const REHAB_RESPONSE: CoachResponse = {
-  summary: 'Rehab mode today to protect the issue and keep load light.',
-  prescription: REHAB_PRESCRIPTION,
-  integrationNote: 'Stop if pain increases and reassess before the next run.',
+  message: 'Protecting the issue today. Light movement only, no running.',
+  session: REHAB_SESSION,
+  confidence: 'high',
 };
 
 const OPTION_PATTERN = /option\s*(a\/b|a|b)\b/gi;
+const EITHER_OR_PATTERN = /\b(you could|either|or you could|option 1|option 2|if you prefer)\b/gi;
+const EMOJI_PATTERN = /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F900}-\u{1F9FF}]|[\u{1FA00}-\u{1FA6F}]|[\u{1FA70}-\u{1FAFF}]/gu;
 const QUESTION_PATTERN = /\?/g;
 const WORSENING_PATTERN = /(worsen|worsening|get(ting)? worse|worse|increasing|persistent)/i;
 
@@ -111,7 +144,15 @@ export function deriveSafetyFlags(message: string, context?: CoachRequestContext
 }
 
 function stripOptions(text: string): string {
-  return text.replace(OPTION_PATTERN, '').replace(/\s{2,}/g, ' ').trim();
+  return text
+    .replace(OPTION_PATTERN, '')
+    .replace(EITHER_OR_PATTERN, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function stripEmojis(text: string): string {
+  return text.replace(EMOJI_PATTERN, '').trim();
 }
 
 function limitQuestions(text: string, maxQuestions = 2): string {
@@ -123,86 +164,73 @@ function limitQuestions(text: string, maxQuestions = 2): string {
 }
 
 function sanitizeText(text: string): string {
-  return limitQuestions(stripOptions(text));
-}
-
-// Vitest expectations require `\d+ x \d+` (digits only after the `x`).
-// Normalize common unit suffixes (e.g. 400m, 20s, 8min) so guardrails keep
-// structured prescriptions and tests remain stable.
-function normalizeSetsRepsDigits(text: string): string {
-  return text.replace(
-    /(\b\d+\s*x\s*)(\d+)\s*(m|km|s|sec|secs|second|seconds|min|mins|minute|minutes)\b/gi,
-    '$1$2$3 ($1$2)'
-  );
-}
-
-function hasStructuredPrescription(prescription: string): boolean {
-  const normalized = normalizeSetsRepsDigits(prescription);
-  const hasSets = /\b\d+\s*x\s*\d+\b/i.test(normalized);
-  const hasRest = /\brest\b/i.test(normalized);
-  return hasSets && hasRest;
+  return limitQuestions(stripEmojis(stripOptions(text)));
 }
 
 function withMedicalEscalation(response: CoachResponse): CoachResponse {
-  if (response.integrationNote.includes(MEDICAL_ESCALATION_LINE)) {
+  if (response.message.includes(MEDICAL_ESCALATION_LINE)) {
     return response;
   }
   return {
     ...response,
-    integrationNote: `${response.integrationNote} ${MEDICAL_ESCALATION_LINE}`.trim(),
+    message: `${response.message} ${MEDICAL_ESCALATION_LINE}`.trim(),
   };
 }
 
-function ensurePrescriptionStructure(
-  response: CoachResponse,
-  safety: SafetyFlags
-): CoachResponse {
-  if (hasStructuredPrescription(response.prescription)) {
-    return response;
-  }
-
-  if (safety.rehabMode) {
-    return { ...response, prescription: normalizeSetsRepsDigits(REHAB_PRESCRIPTION) };
-  }
-
-  if (safety.readinessRed) {
-    return { ...response, prescription: normalizeSetsRepsDigits(RECOVERY_PRESCRIPTION) };
-  }
-
-  return { ...response, prescription: normalizeSetsRepsDigits(STANDARD_PRESCRIPTION) };
+function withAlert(response: CoachResponse, alert: CoachResponse['alert']): CoachResponse {
+  return {
+    ...response,
+    alert,
+  };
 }
 
 export function fallbackCoachResponse(safety: SafetyFlags): CoachResponse {
   if (safety.rehabMode) {
-    return safety.persistentOrWorsening ? withMedicalEscalation(REHAB_RESPONSE) : REHAB_RESPONSE;
+    const response = safety.persistentOrWorsening
+      ? withMedicalEscalation(REHAB_RESPONSE)
+      : REHAB_RESPONSE;
+    return withAlert(response, {
+      severity: 'warning',
+      title: 'Pain Detected',
+      details: 'Switching to rehab mode. No running until pain subsides.',
+    });
   }
+
   if (safety.readinessRed) {
-    return safety.persistentOrWorsening ? withMedicalEscalation(RECOVERY_RESPONSE) : RECOVERY_RESPONSE;
+    return safety.persistentOrWorsening
+      ? withMedicalEscalation(RECOVERY_RESPONSE)
+      : RECOVERY_RESPONSE;
   }
-  return safety.persistentOrWorsening ? withMedicalEscalation(STANDARD_RESPONSE) : STANDARD_RESPONSE;
+
+  return safety.persistentOrWorsening
+    ? withMedicalEscalation(STANDARD_RESPONSE)
+    : STANDARD_RESPONSE;
 }
 
 export function finalizeCoachResponse(
   response: CoachResponse,
   safety: SafetyFlags
 ): CoachResponse {
-  let next = {
-    summary: sanitizeText(response.summary),
-    prescription: normalizeSetsRepsDigits(sanitizeText(response.prescription)),
-    integrationNote: sanitizeText(response.integrationNote),
+  // Start with sanitized message
+  let next: CoachResponse = {
+    ...response,
+    message: sanitizeText(response.message),
+    confidence: response.confidence ?? 'medium',
   };
 
+  // Override with safety-based response if needed
   if (safety.rehabMode) {
     next = fallbackCoachResponse(safety);
   } else if (safety.readinessRed) {
     next = fallbackCoachResponse({ ...safety, rehabMode: false });
   }
 
+  // Add medical escalation if persistent or worsening
   if (safety.persistentOrWorsening) {
     next = withMedicalEscalation(next);
   }
 
-  next = ensurePrescriptionStructure(next, safety);
-
-  return CoachResponseSchema.parse(next);
+  // Validate against schema
+  const result = CoachResponseSchema.safeParse(next);
+  return result.success ? result.data : fallbackCoachResponse(safety);
 }
