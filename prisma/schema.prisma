@@ -1,3 +1,6 @@
+// prisma/schema.prisma
+// COACH v2.0 Database Schema
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,94 +10,154 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// ATHLETE - Core user profile
+// ============================================
 model Athlete {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Basic info
   name           String
   email          String?  @unique
   experienceLevel String  @default("intermediate")
+  
+  // Goal
   goalType       String?
   goalRace       String?
   goalDate       DateTime?
   goalTime       String?
+
+  // Preferences
   weeklyRunDays  Int      @default(4)
   longRunDay     String   @default("Saturday")
   preferredUnits String   @default("km")
+  
+  // Relations
   memory         CoachMemory?
   workouts       Workout[]
   checkIns       CheckIn[]
   conversations  Conversation[]
 }
 
+// ============================================
+// COACH MEMORY - The 6-layer memory system
+// ============================================
 model CoachMemory {
   id        String   @id @default(cuid())
   athleteId String   @unique
   athlete   Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Layer 1: Immutable Core
   coreName          String
   coreExperience    String   @default("intermediate")
   coreGoal          String?
   coreConstraints   String?
   coreStyle         String?
+  
+  // Layer 2: Performance Metrics (JSON)
   metricsJson       String   @default("{}")
+  
+  // Layer 3: Behavioral Patterns (JSON)
   patternsJson      String   @default("{}")
   lastPatternSync   DateTime?
+  
+  // Layer 4: Active Threads (JSON)
   threadsJson       String   @default("{}")
+  
+  // Layer 5: Session Memory (JSON)
   sessionJson       String   @default("{}")
 }
 
+// ============================================
+// WORKOUT - Logged training sessions
+// ============================================
 model Workout {
   id        String   @id @default(cuid())
   athleteId String
   athlete   Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  
   createdAt DateTime @default(now())
   date      DateTime @default(now())
+
+  // Planned
   plannedType     String?
   plannedDuration Int?
   plannedDistance Float?
   plannedNotes    String?
+
+  // Actual
   actualType      String?
   actualDuration  Int?
   actualDistance  Float?
   actualPace      String?
   actualHrAvg     Int?
   actualEffort    String?
+  
+  // Feedback
   feelingBefore   Int?
   feelingAfter    Int?
   notes           String?
+  
+  // Status
   status          String   @default("planned")
   skipReason      String?
+
   @@index([athleteId, date])
 }
 
+// ============================================
+// CHECK-IN - Daily wellness check-ins
+// ============================================
 model CheckIn {
   id        String   @id @default(cuid())
   athleteId String
   athlete   Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  
   createdAt DateTime @default(now())
   date      DateTime @default(now())
+
+  // Wellness scores (0-100)
   readiness   Int?
   soreness    Int?
   sleepQuality Int?
   motivation  Int?
   stress      Int?
+
+  // Sleep
   sleepHours  Float?
+  
+  // Notes
   notes       String?
+  
+  // Injury flags
   hasInjury   Boolean @default(false)
   injuryNotes String?
+
   @@index([athleteId, date])
 }
 
+// ============================================
+// CONVERSATION - Chat history
+// ============================================
 model Conversation {
   id        String   @id @default(cuid())
   athleteId String
   athlete   Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Messages as JSON
   messagesJson String @default("[]")
+  
+  // Metadata
   messageCount Int    @default(0)
   lastIntent   String?
+  
   @@index([athleteId, createdAt])
 }
