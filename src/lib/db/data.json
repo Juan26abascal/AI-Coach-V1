@@ -1,7 +1,312 @@
 {
-  "athletes": [],
-  "plans": [],
+  "athletes": [
+    {
+      "id": "8fcf2f62-034c-4fbe-8b87-b522d1821f8e",
+      "userId": "jmabascal26@gmail.com",
+      "createdAt": "2026-02-01T18:20:08.601Z",
+      "updatedAt": "2026-02-01T18:20:08.601Z",
+      "name": "Juan",
+      "goal": "sub 30min 10k",
+      "daysPerWeek": 7,
+      "pr5k": "15min",
+      "pr10k": "31:30",
+      "injuryHistory": "No"
+    },
+    {
+      "id": "ea4c1fec-199f-426e-ab38-591e7b32fff3",
+      "userId": "rb",
+      "createdAt": "2026-02-01T18:24:36.137Z",
+      "updatedAt": "2026-02-01T18:24:36.137Z",
+      "name": "Runner",
+      "goal": "Consistency and speed",
+      "daysPerWeek": 4,
+      "injuryHistory": "No current issues"
+    }
+  ],
+  "plans": [
+    {
+      "id": "098d4144-04c2-45db-805f-9d515e76a628",
+      "userId": "jmabascal26@gmail.com",
+      "createdAt": "2026-02-01T18:20:08.603Z",
+      "updatedAt": "2026-02-01T18:20:08.603Z",
+      "weekOf": "2026-02-01T18:20:08.602Z",
+      "days": [
+        {
+          "title": "Recovery",
+          "details": "Rest or 25 min easy",
+          "focus": "Recovery"
+        },
+        {
+          "title": "Easy Run",
+          "details": "35–40 min easy + 4 strides",
+          "focus": "Aerobic"
+        },
+        {
+          "title": "Recovery",
+          "details": "Rest or 25 min easy",
+          "focus": "Recovery"
+        },
+        {
+          "title": "Tempo Touch",
+          "details": "3 x 6 min comfortably hard",
+          "focus": "Threshold"
+        },
+        {
+          "title": "Recovery",
+          "details": "Rest or 25 min easy",
+          "focus": "Recovery"
+        },
+        {
+          "title": "Long Run",
+          "details": "55 min easy, smooth effort",
+          "focus": "Endurance"
+        },
+        {
+          "title": "Recovery",
+          "details": "Rest or 25 min easy",
+          "focus": "Recovery"
+        }
+      ],
+      "nextSession": {
+        "title": "Easy Run",
+        "details": "35–40 min easy + 4 strides",
+        "focus": "Aerobic"
+      }
+    },
+    {
+      "id": "d5f9f5af-046d-4e8a-b634-9cdcd045fbad",
+      "userId": "rb",
+      "createdAt": "2026-02-01T18:24:36.138Z",
+      "updatedAt": "2026-02-01T18:24:36.138Z",
+      "weekOf": "2026-02-01T18:24:36.138Z",
+      "days": [
+        {
+          "title": "Recovery",
+          "details": "Rest or 25 min easy",
+          "focus": "Recovery"
+        },
+        {
+          "title": "Easy Run",
+          "details": "35–40 min easy + 4 strides",
+          "focus": "Aerobic"
+        },
+        {
+          "title": "Recovery",
+          "details": "Rest or 25 min easy",
+          "focus": "Recovery"
+        },
+        {
+          "title": "Tempo Touch",
+          "details": "3 x 6 min comfortably hard",
+          "focus": "Threshold"
+        },
+        {
+          "title": "Recovery",
+          "details": "Rest or 25 min easy",
+          "focus": "Recovery"
+        },
+        {
+          "title": "Long Run",
+          "details": "55 min easy, smooth effort",
+          "focus": "Endurance"
+        },
+        {
+          "title": "Recovery",
+          "details": "Rest or 25 min easy",
+          "focus": "Recovery"
+        }
+      ],
+      "nextSession": {
+        "title": "Easy Run",
+        "details": "35–40 min easy + 4 strides",
+        "focus": "Aerobic"
+      }
+    }
+  ],
   "workouts": [],
-  "checkIns": [],
-  "messages": []
+  "checkIns": [
+    {
+      "id": "118bb725-2d1c-4ee0-9806-d5af2d211154",
+      "userId": "jmabascal26@gmail.com",
+      "readiness": 3,
+      "soreness": 2,
+      "sleep": 3,
+      "motivation": 4,
+      "note": "",
+      "createdAt": "2026-02-01T18:43:27.652Z"
+    }
+  ],
+  "messages": [
+    {
+      "id": "2df3cdb1-b24e-462b-9ab5-43819c121c99",
+      "userId": "jmabascal26@gmail.com",
+      "role": "assistant",
+      "content": "Welcome, Juan. I built your first week around 7 run days. We’ll adjust based on your feedback.",
+      "createdAt": "2026-02-01T18:20:08.604Z"
+    },
+    {
+      "id": "160d3c29-0fa3-4cc7-b68e-78e740dc874e",
+      "userId": "jmabascal26@gmail.com",
+      "role": "assistant",
+      "content": "Your next session is ready. Keep it conversational and smooth.",
+      "createdAt": "2026-02-01T18:20:08.604Z"
+    },
+    {
+      "id": "bf5fbdd6-377f-428c-91a1-b32ed4ad8c46",
+      "userId": "jmabascal26@gmail.com",
+      "role": "user",
+      "content": "Whats my workout for today?",
+      "createdAt": "2026-02-01T18:20:26.142Z"
+    },
+    {
+      "id": "e677b839-7634-4457-8ded-8b253c2d9889",
+      "userId": "jmabascal26@gmail.com",
+      "role": "coach",
+      "content": "Coach response ready.",
+      "blocks": [
+        {
+          "title": "Coach",
+          "bullets": [
+            "I'm having trouble processing that right now. Could you try rephrasing your question?"
+          ]
+        }
+      ],
+      "createdAt": "2026-02-01T18:20:27.203Z"
+    },
+    {
+      "id": "47e5e1ed-be4c-4355-943b-53014aeb952e",
+      "userId": "rb",
+      "role": "assistant",
+      "content": "Welcome, Runner. I built your first week around 4 run days. We’ll adjust based on your feedback.",
+      "createdAt": "2026-02-01T18:24:36.141Z"
+    },
+    {
+      "id": "3846a5ce-6536-4f3b-8b6c-c891c581b607",
+      "userId": "rb",
+      "role": "assistant",
+      "content": "Your next session is ready. Keep it conversational and smooth.",
+      "createdAt": "2026-02-01T18:24:36.141Z"
+    },
+    {
+      "id": "e52165f9-cee6-489f-a594-1650ad992b67",
+      "userId": "jmabascal26@gmail.com",
+      "role": "user",
+      "content": "whats my workout for today?",
+      "createdAt": "2026-02-01T18:28:52.484Z"
+    },
+    {
+      "id": "3a3909c4-3faa-49fa-9dd4-67b435e4019a",
+      "userId": "jmabascal26@gmail.com",
+      "role": "coach",
+      "content": "Coach response ready.",
+      "blocks": [
+        {
+          "title": "Coach",
+          "bullets": [
+            "{\n  \"message\": \"Today's session is a lactate threshold interval workout to enhance your aerobic power and lactate clearance.\",\n  \"session\": {\n    \"type\": \"threshold\",\n    \"title\": \"Lactate Threshold Intervals\",\n    \"warmup\": {\"duration\": \"15 min\", \"description\": \"Easy jogging with drills and strides to prepare.\"},\n    \"main\": {\n      \"structure\": \"6 x 1000m intervals at Zone 4 (lactate threshold) pace\",\n      \"target\": \"Maintain pace near 10k to half-marathon race pace\",\n      \"recovery\": \"400m 'float' recovery jog at high Zone 2 pace\"\n    },\n    \"cooldown\": {\"duration\": \"15 min\", \"description\": \"Easy jogging in Zone 1\"},\n    \"totalTime\": \"50 min\"\n  },\n  \"confidence\": \"high\"\n}{\n  \"message\": \"Today's workout: 6x1000m at lactate threshold pace with 400m active recovery jogs, plus warm-up and cool-down.\",\n  \"session\": {\n    \"type\": \"threshold\",\n    \"title\": \"Lactate Threshold Intervals\",\n    \"warmup\": { \"duration\": \"15 min\", \"description\": \"Easy jog and drills\" },\n    \"main\": {\n      \"structure\": \"6 x 1000m at Zone 4 pace\",\n      \"target\": \"Maintain a pace between 10K and half-marathon race pace\",\n      \"recovery\": \"400m jog at high Zone 2 pace\"\n    },\n    \"cooldown\": { \"duration\": \"15 min\", \"description\": \"Easy jogging in Zone 1\" },\n    \"totalTime\": \"50 min\"\n  },\n  \"confidence\": \"high\"\n}"
+          ]
+        }
+      ],
+      "createdAt": "2026-02-01T18:29:01.548Z"
+    },
+    {
+      "id": "bb4d2264-b5d9-4eab-b139-8c19b06c3d43",
+      "userId": "rb",
+      "role": "user",
+      "content": "whats my workout for today?",
+      "createdAt": "2026-02-01T18:32:12.073Z"
+    },
+    {
+      "id": "1a5bc161-486d-4dc5-b6d5-c019429812fa",
+      "userId": "rb",
+      "role": "coach",
+      "content": "Coach response ready.",
+      "blocks": [
+        {
+          "title": "Coach",
+          "bullets": [
+            "Today's workout targets lactate threshold with intervals to boost clearance and aerobic efficiency."
+          ]
+        },
+        {
+          "title": "Workout",
+          "bullets": [
+            "Type: threshold",
+            "Title: 6 x 1000m Intervals at Zone 4 Pace",
+            "Total Time: 50 min"
+          ]
+        }
+      ],
+      "createdAt": "2026-02-01T18:32:19.558Z"
+    },
+    {
+      "id": "e8b9d56a-f6d7-4495-9fc9-33186c608d14",
+      "userId": "jmabascal26@gmail.com",
+      "role": "assistant",
+      "content": "Coach response ready.",
+      "blocks": [
+        {
+          "title": "Coach",
+          "bullets": [
+            "Your load is optimal and readiness stable. Soreness, sleep, and motivation are moderate. Let's maintain steady progress with a balanced tempo session."
+          ]
+        },
+        {
+          "title": "Workout",
+          "bullets": [
+            "Type: tempo",
+            "Title: Steady Tempo Run",
+            "Duration: 30 min",
+            "Effort: Comfortably hard, steady pace at threshold effort",
+            "Total Time: 30 min"
+          ]
+        }
+      ],
+      "createdAt": "2026-02-01T18:43:31.180Z"
+    },
+    {
+      "id": "f3b90d6d-95f6-4617-99c8-7372d3d4ff39",
+      "userId": "jmabascal26@gmail.com",
+      "role": "user",
+      "content": "whats my workout for today?",
+      "createdAt": "2026-02-01T18:43:41.983Z"
+    },
+    {
+      "id": "5c6236a6-a17b-4fa9-a736-9b40729b6807",
+      "userId": "jmabascal26@gmail.com",
+      "role": "assistant",
+      "content": "{\n  \"message\": \"Today's workout focuses on developing lactate threshold with intervals suited to your optimal load and readiness.\",\n  \"session\": {\n    \"type\": \"threshold\",\n    \"title\": \"Lactate Threshold Intervals\",\n    \"warmup\": {\"duration\": \"15 min\", \"description\": \"Easy jog with strides to prepare the body.\"},\n    \"main\": {\n      \"structure\": \"6 × 1000m at Zone 4 pace (lactate threshold),\",\n      \"target\": \"run at current 10K race pace,\",\n      \"recovery\": \"400m easy jog at low Zone 2 pace between intervals.\"\n    },\n    \"cooldown\": {\"duration\": \"15 min\", \"description\": \"Easy running in Zone 1 to flush lactate.\"},\n    \"totalTime\": \"50 min\"\n  },\n  \"confidence\": \"high\"\n}{\n  \"message\": \"Today's workout targets lactate threshold to improve your aerobic power and lactate clearance.\",\n  \"session\": {\n    \"type\": \"threshold\",\n    \"title\": \"6x1000m @ Zone 4 pace\",\n    \"warmup\": {\"duration\": \"15 min\", \"description\": \"Easy jogging with strides.\"},\n    \"main\": {\n      \"structure\": \"6 repeats of 1000m\",\n      \"target\": \"Zone 4 (lactate threshold pace, approx 10K pace)\",\n      \"recovery\": \"400m float recovery jog at low Zone 2 pace\"\n    },\n    \"cooldown\": {\"duration\": \"15 min\", \"description\": \"Easy running in Zone 1\"},\n    \"totalTime\": \"50 min\"\n  },\n  \"confidence\": \"high\"\n}",
+      "blocks": [
+        {
+          "title": "Coach",
+          "bullets": [
+            "{\n  \"message\": \"Today's workout focuses on developing lactate threshold with intervals suited to your optimal load and readiness.\",\n  \"session\": {\n    \"type\": \"threshold\",\n    \"title\": \"Lactate Threshold Intervals\",\n    \"warmup\": {\"duration\": \"15 min\", \"description\": \"Easy jog with strides to prepare the body.\"},\n    \"main\": {\n      \"structure\": \"6 × 1000m at Zone 4 pace (lactate threshold),\",\n      \"target\": \"run at current 10K race pace,\",\n      \"recovery\": \"400m easy jog at low Zone 2 pace between intervals.\"\n    },\n    \"cooldown\": {\"duration\": \"15 min\", \"description\": \"Easy running in Zone 1 to flush lactate.\"},\n    \"totalTime\": \"50 min\"\n  },\n  \"confidence\": \"high\"\n}{\n  \"message\": \"Today's workout targets lactate threshold to improve your aerobic power and lactate clearance.\",\n  \"session\": {\n    \"type\": \"threshold\",\n    \"title\": \"6x1000m @ Zone 4 pace\",\n    \"warmup\": {\"duration\": \"15 min\", \"description\": \"Easy jogging with strides.\"},\n    \"main\": {\n      \"structure\": \"6 repeats of 1000m\",\n      \"target\": \"Zone 4 (lactate threshold pace, approx 10K pace)\",\n      \"recovery\": \"400m float recovery jog at low Zone 2 pace\"\n    },\n    \"cooldown\": {\"duration\": \"15 min\", \"description\": \"Easy running in Zone 1\"},\n    \"totalTime\": \"50 min\"\n  },\n  \"confidence\": \"high\"\n}"
+          ]
+        }
+      ],
+      "createdAt": "2026-02-01T18:43:49.605Z"
+    },
+    {
+      "id": "3b29cb9d-57d3-4bf7-8530-f2ab938c835a",
+      "userId": "jmabascal26@gmail.com",
+      "role": "user",
+      "content": "whats todays wrokout",
+      "createdAt": "2026-02-01T18:48:45.861Z"
+    },
+    {
+      "id": "e1bcc578-a0bc-4af1-be18-d52be3f414cd",
+      "userId": "jmabascal26@gmail.com",
+      "role": "assistant",
+      "content": "{\n  \"message\": \"Today's workout is focused on lactate threshold endurance for a well-trained 10K runner.\",\n  \"session\": {\n    \"type\": \"threshold\",\n    \"title\": \"2 x 3 Miles at Threshold Pace\",\n    \"warmup\": {\n      \"duration\": \"15 min\",\n      \"description\": \"Easy running in Zone 1-2 to prepare\"\n    },\n    \"main\": {\n      \"structure\": \"2 sets of 3 miles at lactate threshold pace\",\n      \"target\": \"Maintain steady tempo effort, just below 10K race pace\",\n      \"recovery\": \"3 minutes easy jog between sets\"\n    },\n    \"cooldown\": {\n      \"duration\": \"10 min\",\n      \"description\": \"Easy jogging to flush legs\"\n    },\n    \"totalTime\": \"40-50 min\"\n  },\n  \"confidence\": \"high\"\n}{\n  \"message\": \"Today's workout focuses on building stamina at lactate threshold intensity suited for well-trained runners targeting 10K race demands.\",\n  \"session\": {\n    \"type\": \"threshold\",\n    \"title\": \"Threshold Endurance Run: 2 x 3 Miles\",\n    \"warmup\": {\n      \"duration\": \"15 min\",\n      \"description\": \"Easy running to prepare cardiovascular system\"\n    },\n    \"main\": {\n      \"structure\": \"2 bouts of 3 miles each at lactate threshold pace\",\n      \"target\": \"Sustain just below 10K race pace intensity\",\n      \"recovery\": \"3 minutes easy jog between bouts\"\n    },\n    \"cooldown\": {\n      \"duration\": \"10 min\",\n      \"description\": \"Light jogging to aid recovery\"\n    },\n    \"totalTime\": \"40-50 min\"\n  },\n  \"confidence\": \"high\"\n}",
+      "blocks": [
+        {
+          "title": "Coach",
+          "bullets": [
+            "{\n  \"message\": \"Today's workout is focused on lactate threshold endurance for a well-trained 10K runner.\",\n  \"session\": {\n    \"type\": \"threshold\",\n    \"title\": \"2 x 3 Miles at Threshold Pace\",\n    \"warmup\": {\n      \"duration\": \"15 min\",\n      \"description\": \"Easy running in Zone 1-2 to prepare\"\n    },\n    \"main\": {\n      \"structure\": \"2 sets of 3 miles at lactate threshold pace\",\n      \"target\": \"Maintain steady tempo effort, just below 10K race pace\",\n      \"recovery\": \"3 minutes easy jog between sets\"\n    },\n    \"cooldown\": {\n      \"duration\": \"10 min\",\n      \"description\": \"Easy jogging to flush legs\"\n    },\n    \"totalTime\": \"40-50 min\"\n  },\n  \"confidence\": \"high\"\n}{\n  \"message\": \"Today's workout focuses on building stamina at lactate threshold intensity suited for well-trained runners targeting 10K race demands.\",\n  \"session\": {\n    \"type\": \"threshold\",\n    \"title\": \"Threshold Endurance Run: 2 x 3 Miles\",\n    \"warmup\": {\n      \"duration\": \"15 min\",\n      \"description\": \"Easy running to prepare cardiovascular system\"\n    },\n    \"main\": {\n      \"structure\": \"2 bouts of 3 miles each at lactate threshold pace\",\n      \"target\": \"Sustain just below 10K race pace intensity\",\n      \"recovery\": \"3 minutes easy jog between bouts\"\n    },\n    \"cooldown\": {\n      \"duration\": \"10 min\",\n      \"description\": \"Light jogging to aid recovery\"\n    },\n    \"totalTime\": \"40-50 min\"\n  },\n  \"confidence\": \"high\"\n}"
+          ]
+        }
+      ],
+      "createdAt": "2026-02-01T18:48:56.890Z"
+    }
+  ]
 }

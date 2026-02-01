@@ -165,7 +165,7 @@ export async function POST(request: Request) {
         ],
         tools: fileSearchTool ? [fileSearchTool] : undefined,
         tool_choice: 'auto',
-        max_tokens: 1000,
+        max_output_tokens: 1000,
       });
 
       let outputText = '';

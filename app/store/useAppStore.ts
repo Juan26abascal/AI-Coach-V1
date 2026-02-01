@@ -195,8 +195,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       const coachMessage = await fetchJson<{ message: ChatMessage }>('/api/messages', {
         method: 'POST',
         body: JSON.stringify({
-          role: 'coach',
-          content: (data as { summary?: string }).summary ?? 'Coach response ready.',
+          role: 'assistant',
+          content: (data as { message?: string }).message ?? 'Coach response ready.',
           blocks: (data as { blocks?: unknown[] }).blocks ?? [],
         }),
       });
@@ -250,7 +250,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const coachMessage = await fetchJson<{ message: ChatMessage }>('/api/messages', {
         method: 'POST',
         body: JSON.stringify({
-          role: 'coach',
+          role: 'assistant',
           content: (response as { summary?: string }).summary ?? 'Coach response ready.',
           blocks: (response as { blocks?: unknown[] }).blocks ?? [],
         }),
