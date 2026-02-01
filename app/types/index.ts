@@ -1,4 +1,4 @@
-import type { CoachResponse } from '@/lib/coach/types';
+import type { CoachResponse } from '@/lib/coach/schema';
 
 export type Athlete = {
   id: string;
@@ -42,6 +42,8 @@ export interface Message {
   content: string;
   structuredContent?: CoachResponse;
   timestamp: string;
+  // Add createdAt as alias for timestamp (for compatibility)
+  createdAt?: string;
 }
 
 export type ChatMessage = Message;
@@ -54,3 +56,12 @@ export type CheckIn = {
   note?: string;
   createdAt: string;
 };
+
+// CoachBlock type for structured output display
+export type CoachBlock = {
+  title: string;
+  bullets: string[];
+};
+
+// Re-export CoachResponse for convenience
+export type { CoachResponse } from '@/lib/coach/schema';

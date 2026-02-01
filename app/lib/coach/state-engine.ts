@@ -1,384 +1,269 @@
 /**
- * Athlete State Engine
+ * COACH v2.0 - State Engine
  * 
  * Computes the current state of the athlete based on:
  * - Training history (sessions)
- * - Daily check-ins
- * - Athlete profile
- * 
- * This state is injected into every AI prompt so the coach
- * knows exactly who it's talking to.
+ * - Check-in data (daily wellness)
+ * - Goals and schedule
  */
 
-import type { 
-  AthleteState, 
-  CheckInData, 
-  SessionLog, 
-  AthleteProfile,
-  SessionPrescription 
-} from './types';
-
-import { 
-  getRecentCheckIns, 
-  getRecentSessions, 
-  getAthleteProfile 
-} from '../storage';
+import type { WorkoutLog, DailyCheckIn, AthleteProfile, FitnessMetrics } from './types';
 
 // ============================================
-// TRAINING LOAD CALCULATIONS
+// ATHLETE STATE
 // ============================================
 
-/**
- * Intensity multipliers for different session types
- * Used to calculate training load (duration × intensity)
- */
-const INTENSITY_MULTIPLIERS: Record<SessionPrescription['type'], number> = {
+export interface AthleteState {
+  // Training load
+  acuteLoad: number;      // Last 7 days
+  chronicLoad: number;    // Last 28 days
+  acRatio: number;        // Acute:Chronic ratio
+  loadTrend: 'increasing' | 'stable' | 'decreasing';
+  
+  // Subjective state (from check-ins)
+  readiness: number;      // 0-100
+  soreness: number;       // 0-100
+  sleepQuality: number;   // 0-100
+  motivation: number;     // 0-100
+  
+  // Trends
+  readinessTrend: 'improving' | 'stable' | 'declining';
+  
+  // Injury
+  hasActiveInjury: boolean;
+  injuryDetails?: string;
+  
+  // Schedule
+  daysToGoal?: number;
+  currentPhase: string;
+  scheduledToday?: string;
+  
+  // Patterns
+  completionRate: number; // 0-100
+  bestTrainingDay?: string;
+}
+
+// ============================================
+// LOAD CALCULATION
+// ============================================
+
+const INTENSITY_FACTORS: Record<string, number> = {
   easy: 1.0,
   recovery: 0.8,
-  long: 1.3,
+  long: 1.2,
+  moderate: 1.5,
   threshold: 2.0,
+  tempo: 2.0,
   speed: 2.5,
+  track: 2.5,
   race: 3.0,
 };
 
-/**
- * Parse a time string like "45-60 min" or "~55 min" into a number
- */
-export const parseTimeToMinutes = (timeString: string): number => {
-  if (!timeString) return 0;
-  
-  // Remove "min" and "~" 
-  const cleaned = timeString.replace(/min/gi, '').replace(/~/g, '').trim();
-  
-  // Check for range (e.g., "45-60")
-  if (cleaned.includes('-')) {
-    const [low, high] = cleaned.split('-').map(s => parseInt(s.trim(), 10));
-    return Math.round((low + high) / 2); // Use midpoint
-  }
-  
-  // Single number
-  const parsed = parseInt(cleaned, 10);
-  return isNaN(parsed) ? 0 : parsed;
-};
+function calculateSessionLoad(workout: WorkoutLog): number {
+  const duration = workout.actualDuration || workout.plannedDuration || 30;
+  const factor = INTENSITY_FACTORS[workout.type] || 1.0;
+  return duration * factor;
+}
 
-/**
- * Calculate load score for a single session
- */
-const calculateSessionLoad = (session: SessionLog): number => {
-  const duration = session.actualDuration || parseTimeToMinutes(session.plannedSession.totalTime);
-  const multiplier = INTENSITY_MULTIPLIERS[session.plannedSession.type] || 1.0;
-  return duration * multiplier;
-};
-
-/**
- * Compute acute (7-day) and chronic (28-day) training loads
- * Also calculates the Acute:Chronic ratio
- */
-export const computeTrainingLoads = (sessions: SessionLog[]): {
-  acute: number;
-  chronic: number;
-  acRatio: number;
-} => {
-  const now = new Date();
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const twentyEightDaysAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
-
-  // Separate sessions by time period
-  const acuteSessions = sessions.filter(s => new Date(s.date) >= sevenDaysAgo);
-  const chronicSessions = sessions.filter(s => new Date(s.date) >= twentyEightDaysAgo);
-
-  // Calculate loads
-  const acuteLoad = acuteSessions.reduce((sum, s) => sum + calculateSessionLoad(s), 0);
-  
-  // Chronic load is weekly average over 28 days
-  const totalChronicLoad = chronicSessions.reduce((sum, s) => sum + calculateSessionLoad(s), 0);
-  const chronicLoad = totalChronicLoad / 4; // 4 weeks
-
-  // AC Ratio (avoid division by zero)
-  const acRatio = chronicLoad > 0 ? acuteLoad / chronicLoad : 1.0;
-
-  return {
-    acute: Math.round(acuteLoad),
-    chronic: Math.round(chronicLoad),
-    acRatio: Math.round(acRatio * 100) / 100, // 2 decimal places
-  };
-};
-
-// ============================================
-// TREND ANALYSIS
-// ============================================
-
-/**
- * Analyze trends in check-in data
- */
-export const analyzeTrends = (checkIns: CheckInData[]): {
-  readiness: 'improving' | 'stable' | 'declining';
-  fatigue: 'fresh' | 'normal' | 'fatigued' | 'very_fatigued';
-} => {
-  if (checkIns.length === 0) {
-    return { readiness: 'stable', fatigue: 'normal' };
-  }
-
-  // Sort by timestamp (most recent first)
-  const sorted = [...checkIns].sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+function calculateAcuteLoad(workouts: WorkoutLog[]): number {
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const recentWorkouts = workouts.filter(w => 
+    new Date(w.date).getTime() > sevenDaysAgo && 
+    w.status === 'completed'
   );
+  return recentWorkouts.reduce((sum, w) => sum + calculateSessionLoad(w), 0);
+}
 
-  // Calculate average readiness
-  const avgReadiness = sorted.reduce((sum, c) => sum + c.readiness, 0) / sorted.length;
+function calculateChronicLoad(workouts: WorkoutLog[]): number {
+  const twentyEightDaysAgo = Date.now() - 28 * 24 * 60 * 60 * 1000;
+  const recentWorkouts = workouts.filter(w => 
+    new Date(w.date).getTime() > twentyEightDaysAgo && 
+    w.status === 'completed'
+  );
+  // Weekly average
+  const totalLoad = recentWorkouts.reduce((sum, w) => sum + calculateSessionLoad(w), 0);
+  return totalLoad / 4; // 4 weeks
+}
 
-  // Determine fatigue level based on average readiness
-  let fatigue: 'fresh' | 'normal' | 'fatigued' | 'very_fatigued';
-  if (avgReadiness > 75) {
-    fatigue = 'fresh';
-  } else if (avgReadiness > 60) {
-    fatigue = 'normal';
-  } else if (avgReadiness > 45) {
-    fatigue = 'fatigued';
-  } else {
-    fatigue = 'very_fatigued';
-  }
-
-  // Determine readiness trend (compare recent to older)
-  let readiness: 'improving' | 'stable' | 'declining' = 'stable';
-  if (sorted.length >= 3) {
-    const recent = sorted.slice(0, 2); // Last 2
-    const older = sorted.slice(2, 4);  // Previous 2 (if exist)
+function calculateLoadTrend(workouts: WorkoutLog[]): 'increasing' | 'stable' | 'decreasing' {
+  // Compare last 2 weeks to previous 2 weeks
+  const twoWeeksAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
+  const fourWeeksAgo = Date.now() - 28 * 24 * 60 * 60 * 1000;
+  
+  const recentLoad = workouts
+    .filter(w => new Date(w.date).getTime() > twoWeeksAgo && w.status === 'completed')
+    .reduce((sum, w) => sum + calculateSessionLoad(w), 0);
     
-    if (older.length > 0) {
-      const recentAvg = recent.reduce((sum, c) => sum + c.readiness, 0) / recent.length;
-      const olderAvg = older.reduce((sum, c) => sum + c.readiness, 0) / older.length;
-      
-      const diff = recentAvg - olderAvg;
-      if (diff > 5) {
-        readiness = 'improving';
-      } else if (diff < -5) {
-        readiness = 'declining';
+  const previousLoad = workouts
+    .filter(w => {
+      const time = new Date(w.date).getTime();
+      return time > fourWeeksAgo && time <= twoWeeksAgo && w.status === 'completed';
+    })
+    .reduce((sum, w) => sum + calculateSessionLoad(w), 0);
+  
+  const change = previousLoad > 0 ? (recentLoad - previousLoad) / previousLoad : 0;
+  
+  if (change > 0.1) return 'increasing';
+  if (change < -0.1) return 'decreasing';
+  return 'stable';
+}
+
+// ============================================
+// SUBJECTIVE STATE
+// ============================================
+
+function calculateAverageCheckIn(checkIns: DailyCheckIn[], field: keyof DailyCheckIn, days: number = 3): number {
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  const recent = checkIns
+    .filter(c => new Date(c.date).getTime() > cutoff)
+    .map(c => c[field] as number)
+    .filter(v => typeof v === 'number');
+  
+  if (recent.length === 0) return 70; // Default
+  return recent.reduce((a, b) => a + b, 0) / recent.length;
+}
+
+function calculateTrend(checkIns: DailyCheckIn[], field: keyof DailyCheckIn): 'improving' | 'stable' | 'declining' {
+  const recent = checkIns
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 5)
+    .map(c => c[field] as number)
+    .filter(v => typeof v === 'number');
+  
+  if (recent.length < 3) return 'stable';
+  
+  // Simple linear trend
+  const first = recent.slice(-2).reduce((a, b) => a + b, 0) / 2;
+  const last = recent.slice(0, 2).reduce((a, b) => a + b, 0) / 2;
+  const change = last - first;
+  
+  if (change > 5) return 'improving';
+  if (change < -5) return 'declining';
+  return 'stable';
+}
+
+// ============================================
+// COMPLETION RATE
+// ============================================
+
+function calculateCompletionRate(workouts: WorkoutLog[]): number {
+  const fourWeeksAgo = Date.now() - 28 * 24 * 60 * 60 * 1000;
+  const recent = workouts.filter(w => new Date(w.date).getTime() > fourWeeksAgo);
+  
+  if (recent.length === 0) return 80; // Default for new users
+  
+  const completed = recent.filter(w => w.status === 'completed' || w.status === 'modified').length;
+  return Math.round((completed / recent.length) * 100);
+}
+
+function findBestTrainingDay(workouts: WorkoutLog[]): string | undefined {
+  const dayStats: Record<string, { completed: number; total: number }> = {};
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  
+  for (const workout of workouts) {
+    const day = days[new Date(workout.date).getDay()];
+    if (!dayStats[day]) dayStats[day] = { completed: 0, total: 0 };
+    dayStats[day].total++;
+    if (workout.status === 'completed') dayStats[day].completed++;
+  }
+  
+  let bestDay: string | undefined;
+  let bestRate = 0;
+  
+  for (const [day, stats] of Object.entries(dayStats)) {
+    if (stats.total >= 3) { // Need at least 3 samples
+      const rate = stats.completed / stats.total;
+      if (rate > bestRate) {
+        bestRate = rate;
+        bestDay = day;
       }
     }
   }
-
-  return { readiness, fatigue };
-};
-
-// ============================================
-// FULL STATE COMPUTATION
-// ============================================
-
-/**
- * Compute the complete athlete state
- * This is the main function called before each AI interaction
- */
-export const computeAthleteState = (): AthleteState => {
-  // Fetch data from storage
-  const sessions = getRecentSessions(28);
-  const checkIns = getRecentCheckIns(7);
-  const profile = getAthleteProfile();
-
-  // Compute training loads
-  const { acute, chronic, acRatio } = computeTrainingLoads(sessions);
-
-  // Analyze trends
-  const { readiness: readinessTrend, fatigue } = analyzeTrends(checkIns);
-
-  // Get most recent check-in
-  const mostRecent = checkIns.length > 0 
-    ? [...checkIns].sort((a, b) => 
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      )[0]
-    : null;
-
-  // Get most recent session
-  const mostRecentSession = sessions.length > 0
-    ? [...sessions].sort((a, b) => 
-        new Date(b.date).getTime() - new Date(a.date).getTime()
-      )[0]
-    : null;
-
-  // Calculate days to event
-  let daysToEvent: number | null = null;
-  if (profile?.goalEvent?.date) {
-    const eventDate = new Date(profile.goalEvent.date);
-    const today = new Date();
-    daysToEvent = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  }
-
-  // Determine fatigue trend direction
-  let fatigueTrend: 'increasing' | 'stable' | 'decreasing' = 'stable';
-  if (readinessTrend === 'declining') fatigueTrend = 'increasing';
-  if (readinessTrend === 'improving') fatigueTrend = 'decreasing';
-
-  // Calculate completion rate from sessions
-  const completedSessions = sessions.filter(s => s.status === 'completed').length;
-  const completionRate = sessions.length > 0 
-    ? Math.round((completedSessions / sessions.length) * 100) 
-    : 100;
-
-  // Check for injury mentions in recent check-in notes
-  const injuryKeywords = ['pain', 'hurt', 'injury', 'sore', 'ache', 'twinge', 'strain'];
-  const hasInjuryMention = checkIns.some(c => 
-    c.notes && injuryKeywords.some(keyword => 
-      c.notes!.toLowerCase().includes(keyword)
-    )
-  );
-
-  // Build the state object
-  const state: AthleteState = {
-    physiological: {
-      acuteLoad: acute,
-      chronicLoad: chronic,
-      acRatio,
-      fatigueTrend,
-      lastSessionDate: mostRecentSession?.date || null,
-      lastSessionType: mostRecentSession?.plannedSession.type || null,
-      lastSessionFeedback: mostRecentSession?.feedback || null,
-    },
-    subjective: {
-      readiness: mostRecent?.readiness ?? 70,
-      soreness: mostRecent?.soreness ?? 30,
-      sleepQuality: mostRecent?.sleepQuality ?? 70,
-      motivation: mostRecent?.motivation ?? 70,
-      notes: mostRecent?.notes || null,
-      checkInDate: mostRecent?.timestamp || null,
-    },
-    schedule: {
-      availableTimeMinutes: null, // Set when user provides
-      currentPhase: profile?.currentPhase || 'base',
-      daysToEvent,
-      eventName: profile?.goalEvent?.name || null,
-    },
-    injury: {
-      hasActiveInjury: hasInjuryMention,
-      injuryDescription: hasInjuryMention 
-        ? checkIns.find(c => c.notes && injuryKeywords.some(k => c.notes!.toLowerCase().includes(k)))?.notes || null
-        : null,
-      injuryGrade: null, // Would need explicit tracking
-      injuryLocation: null,
-    },
-    history: {
-      totalSessions: sessions.length,
-      completionRate,
-      pushbackRate: 0, // Would need tracking
-      averageSessionsPerWeek: sessions.length > 0 ? Math.round(sessions.length / 4) : 0,
-    },
-  };
-
-  return state;
-};
+  
+  return bestDay;
+}
 
 // ============================================
-// PROMPT FORMATTING
+// MAIN FUNCTION
 // ============================================
 
-/**
- * Format the athlete state into a string for the AI prompt
- */
-export const formatStateForPrompt = (state: AthleteState): string => {
-  // Helper to format AC ratio with risk level
-  const formatAcRatio = (ratio: number): string => {
-    if (ratio > 1.5) return `${ratio} [HIGH RISK]`;
-    if (ratio > 1.3) return `${ratio} [ELEVATED]`;
-    if (ratio < 0.8) return `${ratio} [LOW - possible detraining]`;
-    return `${ratio} [OPTIMAL]`;
-  };
+export interface ComputeStateInput {
+  workouts: WorkoutLog[];
+  checkIns: DailyCheckIn[];
+  profile?: AthleteProfile;
+  goalDate?: string;
+  scheduledToday?: string;
+}
 
-  // Helper to format fatigue state
-  const formatFatigue = (trend: string): string => {
-    switch (trend) {
-      case 'increasing': return 'Increasing (concerning)';
-      case 'decreasing': return 'Decreasing (recovering)';
-      default: return 'Stable';
-    }
-  };
-
-  const lines: string[] = [
-    '=== ATHLETE STATE ===',
-    '',
-    'PHYSIOLOGICAL:',
-    `- Acute load (7d): ${state.physiological.acuteLoad} training units`,
-    `- Chronic load (28d avg): ${state.physiological.chronicLoad} training units`,
-    `- AC Ratio: ${formatAcRatio(state.physiological.acRatio)}`,
-    `- Fatigue trend: ${formatFatigue(state.physiological.fatigueTrend)}`,
-    state.physiological.lastSessionDate 
-      ? `- Last session: ${state.physiological.lastSessionType} on ${new Date(state.physiological.lastSessionDate).toLocaleDateString()}`
-      : '- Last session: None recorded',
-    state.physiological.lastSessionFeedback
-      ? `- Last feedback: "${state.physiological.lastSessionFeedback}"`
-      : '',
-    '',
-    'SUBJECTIVE (most recent check-in):',
-    `- Readiness: ${state.subjective.readiness}/100`,
-    `- Soreness: ${state.subjective.soreness}/100 ${state.subjective.soreness > 60 ? '[HIGH]' : ''}`,
-    `- Sleep quality: ${state.subjective.sleepQuality}/100 ${state.subjective.sleepQuality < 50 ? '[POOR]' : ''}`,
-    `- Motivation: ${state.subjective.motivation}/100 ${state.subjective.motivation < 40 ? '[LOW]' : ''}`,
-    state.subjective.notes ? `- Notes: "${state.subjective.notes}"` : '',
-    state.subjective.checkInDate 
-      ? `- Check-in date: ${new Date(state.subjective.checkInDate).toLocaleDateString()}`
-      : '- No recent check-in',
-    '',
-    'SCHEDULE:',
-    `- Current phase: ${state.schedule.currentPhase}`,
-    state.schedule.eventName 
-      ? `- Goal event: ${state.schedule.eventName}`
-      : '- No goal event set',
-    state.schedule.daysToEvent !== null
-      ? `- Days to event: ${state.schedule.daysToEvent}`
-      : '',
-    state.schedule.availableTimeMinutes
-      ? `- Available time today: ${state.schedule.availableTimeMinutes} min`
-      : '',
-    '',
-    'INJURY STATUS:',
-    state.injury.hasActiveInjury
-      ? `- ACTIVE CONCERN: ${state.injury.injuryDescription || 'See recent notes'}`
-      : '- No active injury concerns',
-    state.injury.injuryGrade
-      ? `- Injury grade: ${state.injury.injuryGrade}`
-      : '',
-    '',
-    'TRAINING HISTORY:',
-    `- Sessions (last 28d): ${state.history.totalSessions}`,
-    `- Completion rate: ${state.history.completionRate}%`,
-    `- Avg sessions/week: ${state.history.averageSessionsPerWeek}`,
-    '',
-    '=== END STATE ===',
-  ];
-
-  // Filter out empty lines and join
-  return lines.filter(line => line !== '').join('\n');
-};
-
-// ============================================
-// UTILITY EXPORTS
-// ============================================
-
-/**
- * Quick check if athlete is in a concerning state
- */
-export const hasStateConcerns = (state: AthleteState): {
-  hasConcerns: boolean;
-  concerns: string[];
-} => {
-  const concerns: string[] = [];
-
-  if (state.physiological.acRatio > 1.3) {
-    concerns.push('Training load ratio elevated');
-  }
-  if (state.subjective.sleepQuality < 50) {
-    concerns.push('Poor sleep quality');
-  }
-  if (state.subjective.soreness > 60) {
-    concerns.push('High soreness');
-  }
-  if (state.subjective.motivation < 40) {
-    concerns.push('Low motivation');
-  }
-  if (state.injury.hasActiveInjury) {
-    concerns.push('Possible injury concern');
-  }
-
+export function computeAthleteState(input: ComputeStateInput): AthleteState {
+  const { workouts, checkIns, profile, goalDate, scheduledToday } = input;
+  
+  // Training load
+  const acuteLoad = calculateAcuteLoad(workouts);
+  const chronicLoad = calculateChronicLoad(workouts);
+  const acRatio = chronicLoad > 0 ? acuteLoad / chronicLoad : 1.0;
+  
+  // Check for active injury
+  const recentCheckIn = checkIns
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+  
   return {
-    hasConcerns: concerns.length > 0,
-    concerns,
+    acuteLoad: Math.round(acuteLoad),
+    chronicLoad: Math.round(chronicLoad),
+    acRatio: Math.round(acRatio * 100) / 100,
+    loadTrend: calculateLoadTrend(workouts),
+    
+    readiness: Math.round(calculateAverageCheckIn(checkIns, 'readiness')),
+    soreness: Math.round(calculateAverageCheckIn(checkIns, 'soreness')),
+    sleepQuality: Math.round(calculateAverageCheckIn(checkIns, 'sleepQuality')),
+    motivation: Math.round(calculateAverageCheckIn(checkIns, 'motivation')),
+    
+    readinessTrend: calculateTrend(checkIns, 'readiness'),
+    
+    hasActiveInjury: recentCheckIn?.hasInjury || false,
+    injuryDetails: recentCheckIn?.injuryNotes,
+    
+    daysToGoal: goalDate ? Math.ceil((new Date(goalDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000)) : undefined,
+    currentPhase: 'build', // TODO: Calculate from goal date
+    scheduledToday,
+    
+    completionRate: calculateCompletionRate(workouts),
+    bestTrainingDay: findBestTrainingDay(workouts),
   };
-};
+}
+
+// ============================================
+// FORMAT FOR PROMPT
+// ============================================
+
+export function formatStateForPrompt(state: AthleteState): string {
+  const lines: string[] = [];
+  
+  // Load status
+  const acStatus = state.acRatio < 0.8 ? '⚠️ LOW' : 
+                   state.acRatio > 1.3 ? '⚠️ HIGH' : 
+                   '✓ OPTIMAL';
+  lines.push(`LOAD: AC=${state.acRatio.toFixed(2)} ${acStatus} | Trend: ${state.loadTrend}`);
+  
+  // Subjective
+  lines.push(`READINESS: ${state.readiness}/100 (${state.readinessTrend})`);
+  lines.push(`SORENESS: ${state.soreness}/100 | SLEEP: ${state.sleepQuality}/100 | MOTIVATION: ${state.motivation}/100`);
+  
+  // Injury
+  if (state.hasActiveInjury) {
+    lines.push(`⚠️ INJURY: ${state.injuryDetails || 'Active concern'}`);
+  }
+  
+  // Schedule
+  if (state.daysToGoal) {
+    lines.push(`GOAL: ${state.daysToGoal} days away | Phase: ${state.currentPhase}`);
+  }
+  if (state.scheduledToday) {
+    lines.push(`TODAY: ${state.scheduledToday}`);
+  }
+  
+  // Patterns
+  lines.push(`PATTERNS: ${state.completionRate}% completion${state.bestTrainingDay ? ` | Best day: ${state.bestTrainingDay}` : ''}`);
+  
+  return lines.join('\n');
+}

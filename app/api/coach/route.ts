@@ -5,16 +5,19 @@ import { buildFileSearchTool, hasFileSearchResults, VECTOR_STORE_ID } from '@/li
 import {
   buildFullPrompt,
   computeAthleteState,
-  deriveSafetyFlags,
-  fallbackCoachResponse,
-  finalizeCoachResponse,
-  formatDecisionGatesForPrompt,
+  formatGateResultsForPrompt,
   formatStateForPrompt,
   parseCoachResponse,
   runDecisionGates,
   type ConversationMessage,
+  type CoachResponse,
 } from '@/lib/coach';
-import type { CoachBlock, ChatMessage } from '@/types';
+
+// CoachBlock type for structured output
+type CoachBlock = {
+  title: string;
+  bullets: string[];
+};
 
 type RateLimitEntry = {
   count: number;
@@ -45,42 +48,54 @@ function isRateLimited(clientId: string): boolean {
   return false;
 }
 
-function buildBlocks(summary: string, prescription: string, integrationNote: string): CoachBlock[] {
-  const normalizeBullets = (value: string) =>
-    value
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-  return [
-    {
-      title: 'Summary',
-      bullets: normalizeBullets(summary),
-    },
-    {
-      title: 'Prescription',
-      bullets: normalizeBullets(prescription),
-    },
-    {
-      title: 'Integration Note',
-      bullets: normalizeBullets(integrationNote),
-    },
-  ];
+function buildBlocks(response: CoachResponse): CoachBlock[] {
+  const blocks: CoachBlock[] = [];
+  
+  // Main message block
+  if (response.message) {
+    blocks.push({
+      title: 'Coach',
+      bullets: [response.message],
+    });
+  }
+  
+  // Session block if present
+  if (response.session) {
+    const sessionBullets: string[] = [];
+    sessionBullets.push(`Type: ${response.session.type}`);
+    sessionBullets.push(`Title: ${response.session.title}`);
+    if (response.session.duration) sessionBullets.push(`Duration: ${response.session.duration}`);
+    if (response.session.effort) sessionBullets.push(`Effort: ${response.session.effort}`);
+    if (response.session.totalTime) sessionBullets.push(`Total Time: ${response.session.totalTime}`);
+    
+    blocks.push({
+      title: 'Workout',
+      bullets: sessionBullets,
+    });
+  }
+  
+  // Alert block if present
+  if (response.alert) {
+    blocks.push({
+      title: response.alert.title,
+      bullets: [response.alert.details],
+    });
+  }
+  
+  return blocks;
 }
 
-function toChatMessages(conversationHistory?: ConversationMessage[]): ChatMessage[] {
-  if (!conversationHistory?.length) return [];
-  return conversationHistory.map((message, index) => ({
-    id: `history-${index}`,
-    role: message.role === 'assistant' || message.role === 'coach' ? 'coach' : 'user',
-    content: message.content,
-    createdAt: new Date().toISOString(),
-  }));
+// Fallback response when things go wrong
+function fallbackCoachResponse(): CoachResponse {
+  return {
+    message: "I'm having trouble processing that right now. Could you try rephrasing your question?",
+    confidence: 'low',
+  };
 }
 
 function normalizeConversationHistory(conversationHistory?: ConversationMessage[]) {
   return (conversationHistory ?? []).map((message) => ({
-    role: message.role === 'coach' ? 'assistant' : message.role,
+    role: message.role === 'user' ? 'user' as const : 'assistant' as const,
     content: message.content,
   }));
 }
@@ -103,16 +118,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Message is required.' }, { status: 400 });
     }
 
-    const safety = deriveSafetyFlags(message, {
-      recentMessages: toChatMessages(conversationHistory),
-    });
-
     console.info('coach: computing athlete state');
-    const athleteState = computeAthleteState(message, conversationHistory);
+    
+    // Compute athlete state with proper input
+    const stateInput = {
+      workouts: [],
+      checkIns: [],
+      profile: undefined,
+      goalDate: undefined,
+      scheduledToday: undefined,
+    };
+    const athleteState = computeAthleteState(stateInput);
+    
     console.info('coach: running decision gates');
-    const decisionGates = runDecisionGates(athleteState);
+    const gateContext = {
+      state: athleteState,
+      userMessage: message,
+      requestedSession: undefined,
+      timeAvailable: undefined,
+    };
+    const decisionGates = runDecisionGates(gateContext);
+    
     const stateText = formatStateForPrompt(athleteState);
-    const gatesText = formatDecisionGatesForPrompt(decisionGates);
+    const gatesText = formatGateResultsForPrompt(decisionGates);
     const fullPrompt = buildFullPrompt(stateText, gatesText);
 
     try {
@@ -151,19 +179,27 @@ export async function POST(request: Request) {
         console.info('coach: file search returned no results');
       }
 
-      const parsed = parseCoachResponse(finalResponse.output_text ?? outputText);
-      const validated = parsed ? finalizeCoachResponse(parsed, safety) : fallbackCoachResponse(safety);
-      const blocks = buildBlocks(
-        validated.summary,
-        validated.prescription,
-        validated.integrationNote
-      );
+      const responseText = finalResponse.output_text ?? outputText;
+      const parseResult = parseCoachResponse(responseText);
+      
+      let validated: CoachResponse;
+      if (parseResult.success && parseResult.data) {
+        validated = parseResult.data;
+      } else {
+        // If parsing failed, use raw text as message
+        validated = {
+          message: responseText,
+          confidence: 'low',
+        };
+      }
+      
+      const blocks = buildBlocks(validated);
 
       return NextResponse.json({ ...validated, blocks });
     } catch (error) {
       console.error('coach: OpenAI request failed', error);
-      const fallback = fallbackCoachResponse(safety);
-      const blocks = buildBlocks(fallback.summary, fallback.prescription, fallback.integrationNote);
+      const fallback = fallbackCoachResponse();
+      const blocks = buildBlocks(fallback);
       return NextResponse.json({ ...fallback, blocks }, { status: 200 });
     }
   } catch (error) {

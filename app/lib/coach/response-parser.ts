@@ -1,230 +1,255 @@
 /**
- * Response Parser
+ * COACH v2.0 - Response Parser
  * 
- * Extracts structured data from the AI's raw text response.
- * Handles various edge cases where the AI doesn't return perfect JSON.
+ * Extracts structured data from AI responses.
+ * Handles various edge cases where AI doesn't return perfect JSON.
  */
 
-import type { CoachResponse, SessionPrescription } from './types';
+import { CoachResponseSchema, type CoachResponse } from './schema';
+
+// ============================================
+// JSON EXTRACTION
+// ============================================
 
 /**
- * Attempt to parse JSON from a string that may have extra text
+ * Extracts JSON from a potentially messy response
  */
-function tryExtractJSON(text: string): unknown | null {
-  // First, try direct parse
-  try {
-    return JSON.parse(text);
-  } catch {
-    // Continue to other methods
-  }
-
-  // Try to find JSON in markdown code blocks
-  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (codeBlockMatch) {
-    try {
-      return JSON.parse(codeBlockMatch[1].trim());
-    } catch {
-      // Continue
-    }
-  }
-
+function extractJSON(text: string): string | null {
   // Try to find JSON object in the text
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
-    try {
-      return JSON.parse(jsonMatch[0]);
-    } catch {
-      // Try to fix common issues
-      let fixed = jsonMatch[0];
-      
-      // Fix trailing commas
-      fixed = fixed.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
-      
-      // Fix single quotes (risky but sometimes works)
-      // Only do this if double quotes aren't present
-      if (!fixed.includes('"') && fixed.includes("'")) {
-        fixed = fixed.replace(/'/g, '"');
-      }
-      
+  const jsonPatterns = [
+    // Standard JSON object
+    /\{[\s\S]*\}/,
+    // JSON in code blocks
+    /```json\s*([\s\S]*?)\s*```/,
+    /```\s*([\s\S]*?)\s*```/,
+  ];
+  
+  for (const pattern of jsonPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      // If it's a code block capture group, use group 1
+      const jsonStr = match[1] || match[0];
       try {
-        return JSON.parse(fixed);
+        // Validate it's parseable
+        JSON.parse(jsonStr);
+        return jsonStr;
       } catch {
-        // Give up
+        // Continue to next pattern
       }
     }
   }
-
+  
   return null;
 }
 
 /**
- * Check if an object looks like a SessionPrescription
+ * Cleans common JSON issues
  */
-export function validateSessionPrescription(session: unknown): session is SessionPrescription {
-  if (!session || typeof session !== 'object') return false;
-  
-  const s = session as Record<string, unknown>;
-  
-  // Required fields
-  const requiredFields = ['type', 'title', 'warmup', 'main', 'cooldown', 'totalTime'];
-  for (const field of requiredFields) {
-    if (!(field in s)) {
-      console.warn(`Session missing required field: ${field}`);
-      return false;
-    }
-  }
-
-  // Validate type
-  const validTypes = ['threshold', 'easy', 'long', 'speed', 'recovery', 'race'];
-  if (!validTypes.includes(s.type as string)) {
-    console.warn(`Invalid session type: ${s.type}`);
-    return false;
-  }
-
-  // Validate nested objects
-  if (!s.warmup || typeof s.warmup !== 'object') return false;
-  if (!s.main || typeof s.main !== 'object') return false;
-  if (!s.cooldown || typeof s.cooldown !== 'object') return false;
-
-  return true;
+function cleanJSON(text: string): string {
+  return text
+    // Remove trailing commas
+    .replace(/,(\s*[}\]])/g, '$1')
+    // Fix unquoted keys
+    .replace(/(\{|\,)\s*(\w+)\s*:/g, '$1"$2":')
+    // Remove comments
+    .replace(/\/\/.*$/gm, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    // Normalize whitespace
+    .trim();
 }
 
-/**
- * Check if an object looks like a CoachResponse
- */
-export function validateCoachResponse(response: unknown): response is CoachResponse {
-  if (!response || typeof response !== 'object') return false;
-  
-  const r = response as Record<string, unknown>;
-  
-  // Must have message
-  if (typeof r.message !== 'string') {
-    console.warn('Response missing message field');
-    return false;
-  }
+// ============================================
+// MAIN PARSER
+// ============================================
 
-  // Validate session if present
-  if (r.session && !validateSessionPrescription(r.session)) {
-    console.warn('Response has invalid session');
-    // Don't fail completely, just remove the invalid session
-    delete r.session;
-  }
-
-  // Validate alert if present
-  if (r.alert) {
-    const alert = r.alert as Record<string, unknown>;
-    if (!alert.severity || !alert.title || !alert.details) {
-      console.warn('Response has invalid alert');
-      delete r.alert;
-    }
-  }
-
-  // Validate actions if present
-  if (r.actions) {
-    if (!Array.isArray(r.actions)) {
-      console.warn('Response has invalid actions (not array)');
-      delete r.actions;
-    }
-  }
-
-  return true;
+export interface ParseResult {
+  success: boolean;
+  data?: CoachResponse;
+  rawText: string;
+  error?: string;
 }
 
-/**
- * Main parsing function - takes raw AI response and returns structured CoachResponse
- */
-export function parseCoachResponse(rawResponse: string): CoachResponse {
-  if (!rawResponse || typeof rawResponse !== 'string') {
+export function parseCoachResponse(text: string): ParseResult {
+  if (!text || typeof text !== 'string') {
     return {
-      message: 'No response received.',
-      confidence: 'low'
+      success: false,
+      rawText: text || '',
+      error: 'Empty or invalid response',
     };
   }
-
+  
   // Try to extract JSON
-  const parsed = tryExtractJSON(rawResponse);
-
-  if (parsed && typeof parsed === 'object') {
-    const obj = parsed as Record<string, unknown>;
+  let jsonStr = extractJSON(text);
+  
+  if (!jsonStr) {
+    // No JSON found - treat entire text as message
+    return {
+      success: true,
+      data: { message: text.trim() },
+      rawText: text,
+    };
+  }
+  
+  // Clean and parse JSON
+  try {
+    jsonStr = cleanJSON(jsonStr);
+    const parsed = JSON.parse(jsonStr);
     
-    // Check if it's a valid coach response
-    if (validateCoachResponse(obj)) {
+    // Validate against schema
+    const result = CoachResponseSchema.safeParse(parsed);
+    
+    if (result.success) {
       return {
-        message: obj.message as string,
-        session: obj.session as SessionPrescription | undefined,
-        alert: obj.alert as CoachResponse['alert'],
-        actions: obj.actions as CoachResponse['actions'],
-        confidence: (obj.confidence as CoachResponse['confidence']) || 'medium'
+        success: true,
+        data: result.data,
+        rawText: text,
+      };
+    } else {
+      // Schema validation failed - try to salvage
+      // At minimum, we need a message
+      if (typeof parsed.message === 'string') {
+        return {
+          success: true,
+          data: { message: parsed.message },
+          rawText: text,
+        };
+      }
+      
+      return {
+        success: false,
+        rawText: text,
+        error: `Schema validation failed: ${result.error.message}`,
       };
     }
+  } catch (e) {
+    // JSON parse failed - treat as plain text
+    return {
+      success: true,
+      data: { message: text.trim() },
+      rawText: text,
+    };
+  }
+}
 
-    // It's JSON but not the right structure - try to salvage
-    if (typeof obj.message === 'string') {
-      return {
-        message: obj.message,
-        confidence: 'low'
-      };
-    }
+// ============================================
+// SANITIZATION
+// ============================================
 
-    // Check for reply field (old format)
-    if (typeof obj.reply === 'string') {
-      return {
-        message: obj.reply,
-        confidence: 'low'
-      };
+const FORBIDDEN_PATTERNS = [
+  // Options language
+  /you could (do )?(\w+) or/i,
+  /option [1-9a-z]/i,
+  /either .+ or/i,
+  /up to you/i,
+  /your (choice|call)/i,
+  /choose between/i,
+  /if you (want|feel|prefer).+(otherwise|or else)/i,
+];
+
+const EMOJI_PATTERN = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
+
+export interface SanitizeResult {
+  sanitized: CoachResponse;
+  warnings: string[];
+  modified: boolean;
+}
+
+export function sanitizeResponse(response: CoachResponse): SanitizeResult {
+  const warnings: string[] = [];
+  let modified = false;
+  let message = response.message;
+  
+  // Check for emojis
+  if (EMOJI_PATTERN.test(message)) {
+    message = message.replace(EMOJI_PATTERN, '').trim();
+    warnings.push('Removed emoji from response');
+    modified = true;
+  }
+  
+  // Check for forbidden patterns
+  for (const pattern of FORBIDDEN_PATTERNS) {
+    if (pattern.test(message)) {
+      warnings.push(`Found forbidden pattern: ${pattern.toString()}`);
+      // Don't modify - just warn. The AI should be re-prompted.
     }
   }
-
-  // Couldn't parse JSON - use raw text as message
+  
+  // Check response length
+  const wordCount = message.split(/\s+/).length;
+  if (wordCount > 150) {
+    warnings.push(`Response too long: ${wordCount} words (max 150)`);
+  }
+  
   return {
-    message: rawResponse.trim(),
-    confidence: 'low'
+    sanitized: { ...response, message },
+    warnings,
+    modified,
   };
 }
 
-/**
- * Remove emojis from text
- */
-function removeEmojis(text: string): string {
-  // Comprehensive emoji regex
-  return text.replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F900}-\u{1F9FF}]|[\u{1FA00}-\u{1FA6F}]|[\u{1FA70}-\u{1FAFF}]|[\u{231A}-\u{231B}]|[\u{23E9}-\u{23F3}]|[\u{23F8}-\u{23FA}]|[\u{25AA}-\u{25AB}]|[\u{25B6}]|[\u{25C0}]|[\u{25FB}-\u{25FE}]|[\u{2614}-\u{2615}]|[\u{2648}-\u{2653}]|[\u{267F}]|[\u{2693}]|[\u{26A1}]|[\u{26AA}-\u{26AB}]|[\u{26BD}-\u{26BE}]|[\u{26C4}-\u{26C5}]|[\u{26CE}]|[\u{26D4}]|[\u{26EA}]|[\u{26F2}-\u{26F3}]|[\u{26F5}]|[\u{26FA}]|[\u{26FD}]|[\u{2702}]|[\u{2705}]|[\u{2708}-\u{270D}]|[\u{270F}]|[\u{2712}]|[\u{2714}]|[\u{2716}]|[\u{271D}]|[\u{2721}]|[\u{2728}]|[\u{2733}-\u{2734}]|[\u{2744}]|[\u{2747}]|[\u{274C}]|[\u{274E}]|[\u{2753}-\u{2755}]|[\u{2757}]|[\u{2763}-\u{2764}]|[\u{2795}-\u{2797}]|[\u{27A1}]|[\u{27B0}]|[\u{27BF}]|[\u{2934}-\u{2935}]|[\u{2B05}-\u{2B07}]|[\u{2B1B}-\u{2B1C}]|[\u{2B50}]|[\u{2B55}]|[\u{3030}]|[\u{303D}]|[\u{3297}]|[\u{3299}]/gu, '');
+// ============================================
+// VALIDATION HELPERS
+// ============================================
+
+export function containsEmoji(text: string): boolean {
+  return EMOJI_PATTERN.test(text);
 }
 
-/**
- * Sanitize the response - remove emojis, clean up formatting
- */
-export function sanitizeResponse(response: CoachResponse): CoachResponse {
-  return {
-    ...response,
-    message: removeEmojis(response.message).trim(),
-    confidence: response.confidence || 'medium'
-  };
+export function containsOptions(text: string): boolean {
+  return FORBIDDEN_PATTERNS.some(p => p.test(text));
 }
 
-/**
- * Extract just the message text
- */
-export function extractMessage(response: CoachResponse): string {
-  return response.message;
+export function getWordCount(text: string): number {
+  return text.split(/\s+/).filter(w => w.length > 0).length;
 }
 
-/**
- * Check if response has a workout card
- */
-export function hasWorkoutCard(response: CoachResponse): boolean {
-  return !!response.session && validateSessionPrescription(response.session);
+// ============================================
+// TIME CONSTRAINT VALIDATION
+// ============================================
+
+export function validateTimeConstraint(
+  userTimeLimit: number | null,
+  workoutTotalTime: string | undefined
+): { valid: boolean; error?: string } {
+  if (!userTimeLimit || !workoutTotalTime) {
+    return { valid: true };
+  }
+  
+  // Parse workout time (e.g., "45 min" or "40-45 min")
+  const timeMatch = workoutTotalTime.match(/(\d+)(?:-(\d+))?\s*min/);
+  if (!timeMatch) {
+    return { valid: true }; // Can't validate, assume ok
+  }
+  
+  const maxTime = timeMatch[2] ? parseInt(timeMatch[2]) : parseInt(timeMatch[1]);
+  
+  if (maxTime > userTimeLimit) {
+    return {
+      valid: false,
+      error: `Workout time (${maxTime}min) exceeds user limit (${userTimeLimit}min)`,
+    };
+  }
+  
+  return { valid: true };
 }
 
-/**
- * Check if response has an alert
- */
-export function hasAlert(response: CoachResponse): boolean {
-  return !!response.alert && !!response.alert.severity && !!response.alert.title;
-}
+// ============================================
+// EXTRACT TIME FROM USER MESSAGE
+// ============================================
 
-/**
- * Check if response has quick actions
- */
-export function hasActions(response: CoachResponse): boolean {
-  return !!response.actions && Array.isArray(response.actions) && response.actions.length > 0;
+export function extractTimeConstraint(message: string): number | null {
+  const patterns = [
+    /(?:have|only|about|got)\s+(\d+)\s*(?:minutes?|min)/i,
+    /(\d+)\s*(?:minutes?|min)\s+(?:today|available|max)/i,
+    /(\d+)\s*min(?:utes?)?\s+(?:window|slot)/i,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match) {
+      return parseInt(match[1]);
+    }
+  }
+  
+  return null;
 }

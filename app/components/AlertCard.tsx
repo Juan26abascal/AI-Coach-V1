@@ -1,38 +1,39 @@
-import Card from '@/components/Card';
-import type { CoachResponse } from '@/lib/coach/types';
+import type { Alert } from '@/lib/coach/schema';
 
-type AlertCardProps = {
-  alert: CoachResponse['alert'];
-};
-
-const severityMeta: Record<
-  NonNullable<AlertCardProps['alert']>['severity'],
-  { icon: string; border: string; bg: string; text: string }
-> = {
+const severityMeta = {
   warning: {
-    icon: '⚠️',
-    border: 'border-amber-500/70',
     bg: 'bg-amber-500/10',
-    text: 'text-amber-200',
+    border: 'border-amber-500/30',
+    text: 'text-amber-400',
+    icon: '⚠️',
   },
   critical: {
+    bg: 'bg-red-500/10',
+    border: 'border-red-500/30',
+    text: 'text-red-400',
     icon: '🛑',
-    border: 'border-rose-500/70',
-    bg: 'bg-rose-500/10',
-    text: 'text-rose-200',
   },
+};
+
+type AlertCardProps = {
+  alert: Alert | undefined;
 };
 
 export default function AlertCard({ alert }: AlertCardProps) {
+  if (!alert) return null;
+
   const meta = severityMeta[alert.severity];
+  if (!meta) return null;
 
   return (
-    <Card className={`space-y-3 border-l-4 ${meta.border} ${meta.bg}`}>
-      <div className="flex items-center gap-3">
+    <div className={`rounded-lg border ${meta.border} ${meta.bg} p-4`}>
+      <div className="flex items-start gap-3">
         <span className="text-xl">{meta.icon}</span>
-        <h4 className={`text-sm font-semibold ${meta.text}`}>{alert.title}</h4>
+        <div>
+          <h4 className={`text-sm font-semibold ${meta.text}`}>{alert.title}</h4>
+          <p className="mt-1 text-sm text-stone/80">{alert.details}</p>
+        </div>
       </div>
-      <p className="text-sm text-stone/80">{alert.details}</p>
-    </Card>
+    </div>
   );
 }

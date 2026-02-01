@@ -1,289 +1,243 @@
 /**
- * Type definitions for the COACH app
- * 
- * This file contains all shared types used across the coach brain system.
+ * COACH v2.0 - Type Definitions
  */
 
-// Add new card type definitions
+// Re-export CoachResponse from schema for backwards compatibility
+export type { CoachResponse, Session, Alert, SessionPrescription } from './schema';
 
-export type SessionType =
-  | 'easy'
-  | 'recovery'
-  | 'long'
-  | 'threshold'
-  | 'tempo'
-  | 'speed'
-  | 'track'
+// ============================================
+// ATHLETE TYPES
+// ============================================
+
+export interface AthleteProfile {
+  id: string;
+  name: string;
+  email?: string;
+  experienceLevel: 'beginner' | 'intermediate' | 'advanced';
+  goalType?: string;
+  goalRace?: string;
+  goalDate?: string;
+  goalTime?: string;
+  weeklyRunDays: number;
+  longRunDay: string;
+  preferredUnits: 'km' | 'miles';
+}
+
+export interface TrainingZones {
+  easy: { min: string; max: string };
+  moderate: { min: string; max: string };
+  threshold: { min: string; max: string };
+  interval: { min: string; max: string };
+  max: { min: string; max: string };
+}
+
+export interface FitnessMetrics {
+  ctl: number;  // Chronic Training Load
+  atl: number;  // Acute Training Load
+  tsb: number;  // Training Stress Balance
+  acRatio: number;  // Acute:Chronic ratio
+}
+
+// ============================================
+// WORKOUT TYPES
+// ============================================
+
+export type SessionType = 
+  | 'easy' 
+  | 'recovery' 
+  | 'long' 
+  | 'threshold' 
+  | 'tempo' 
+  | 'speed' 
+  | 'track' 
   | 'race';
 
-export type WorkoutCardType = 'simple' | 'standard' | 'complex';
-
-// SIMPLE CARD
-export interface SimpleWorkoutCard {
-  type: 'easy' | 'recovery' | 'long';
-  title: string;
-  duration: string;
-  effort: string;
-  notes?: string;
-  totalTime: string;
-  totalDistance?: string;
-}
-
-// STANDARD CARD (existing structure)
-export interface StandardWorkoutCard {
-  type: 'threshold' | 'tempo';
-  title: string;
-  warmup: {
-    duration: string;
-    description: string;
-  };
-  main: {
-    structure: string;
-    target: string;
-    recovery: string;
-    notes?: string;
-  };
-  cooldown: {
-    duration: string;
-    description: string;
-  };
-  totalTime: string;
-  totalDistance?: string;
-}
-
-// COMPLEX CARD
-export interface ComplexWorkoutCard extends StandardWorkoutCard {
-  type: 'speed' | 'track' | 'race';
-  warmup: {
-    duration: string;
-    description: string;
-    drills?: string[];
-  };
-  cooldown: {
-    duration: string;
-    description: string;
-    stretches?: string[];
-  };
-  equipmentNeeded?: string[];
-}
-
-export type WorkoutCard = SimpleWorkoutCard | StandardWorkoutCard | ComplexWorkoutCard;
-
-// ============================================
-// ATHLETE STATE TYPES
-// ============================================
-
-/**
- * The complete state of the athlete at any given moment
- * This is computed by the state engine and injected into every prompt
- */
-export interface AthleteState {
-  physiological: {
-    acuteLoad: number;
-    chronicLoad: number;
-    acRatio: number;
-    fatigueTrend: 'increasing' | 'stable' | 'decreasing';
-    lastSessionDate: string | null;
-    lastSessionType: string | null;
-    lastSessionFeedback: string | null;
-  };
-  subjective: {
-    readiness: number; // 0-100
-    soreness: number; // 0-100
-    sleepQuality: number; // 0-100
-    motivation: number; // 0-100
-    notes: string | null;
-    checkInDate: string | null;
-  };
-  schedule: {
-    availableTimeMinutes: number | null;
-    currentPhase: string;
-    daysToEvent: number | null;
-    eventName: string | null;
-  };
-  injury: {
-    hasActiveInjury: boolean;
-    injuryDescription: string | null;
-    injuryGrade: 1 | 2 | 3 | 4 | null;
-    injuryLocation: string | null;
-  };
-  history: {
-    totalSessions: number;
-    completionRate: number;
-    pushbackRate: number;
-    averageSessionsPerWeek: number;
-  };
-}
-
-// ============================================
-// SESSION TYPES
-// ============================================
-
-/**
- * A workout prescription from the coach
- */
-export interface SessionPrescription {
-  type: 'threshold' | 'easy' | 'long' | 'speed' | 'recovery' | 'race';
-  title: string;
-  warmup: {
-    duration: string;
-    description: string;
-  };
-  main: {
-    structure: string;
-    target: string;
-    recovery?: string;
-    notes?: string;
-  };
-  cooldown: {
-    duration: string;
-    description: string;
-  };
-  totalTime: string;
-  totalDistance?: string;
-}
-
-/**
- * A logged training session (planned + actual)
- */
-export interface SessionLog {
+export interface WorkoutLog {
   id: string;
   date: string;
-  plannedSession: SessionPrescription;
-  status: 'completed' | 'modified' | 'skipped';
+  type: SessionType;
+  plannedDuration?: number;
+  plannedDistance?: number;
   actualDuration?: number;
   actualDistance?: number;
-  feedback?: string;
-  coachAnalysis?: string;
-}
-
-// ============================================
-// RESPONSE TYPES
-// ============================================
-
-/**
- * The structured response from the coach
- * This is what the API returns and the UI renders
- */
-export interface CoachResponse {
-  message: string;
-  session?: SessionPrescription;
-  weekOverview?: WeekOverview;
-  alert?: {
-    severity: 'warning' | 'critical';
-    title: string;
-    details: string;
-  };
-  actions?: {
-    label: string;
-    value: string;
-  }[];
-  confidence: 'high' | 'medium' | 'low';
-}
-
-/**
- * Weekly plan overview
- */
-export interface WeekOverview {
-  startDate: string;
-  endDate: string;
-  days: {
-    date: string;
-    day: string;
-    type: string;
-    summary: string;
-    isToday: boolean;
-  }[];
-  weekFocus?: string;
+  actualPace?: string;
+  actualHrAvg?: number;
+  effort?: 'easy' | 'moderate' | 'hard' | 'very-hard';
+  status: 'planned' | 'completed' | 'modified' | 'skipped';
+  notes?: string;
 }
 
 // ============================================
 // CHECK-IN TYPES
 // ============================================
 
-/**
- * Daily check-in data from the athlete
- */
-export interface CheckInData {
-  readiness: number;
-  soreness: number;
-  sleepQuality: number;
-  motivation: number;
+export interface DailyCheckIn {
+  id: string;
+  date: string;
+  readiness?: number;  // 0-100
+  soreness?: number;   // 0-100
+  sleepQuality?: number;  // 0-100
+  sleepHours?: number;
+  motivation?: number;  // 0-100
+  stress?: number;  // 0-100
   notes?: string;
-  timestamp: string;
+  hasInjury?: boolean;
+  injuryNotes?: string;
 }
 
 // ============================================
 // CONVERSATION TYPES
 // ============================================
 
-/**
- * A message in the conversation
- */
 export interface ConversationMessage {
-  id: string;
   role: 'user' | 'assistant';
   content: string;
-  structuredContent?: CoachResponse;
-  timestamp: string;
-}
-
-// ============================================
-// DECISION ENGINE TYPES
-// ============================================
-
-/**
- * Result from checking a decision gate
- */
-export interface GateResult {
-  gate: 'safety' | 'recovery' | 'schedule' | 'methodology';
-  triggered: boolean;
-  reason?: string;
-  action?: string;
-}
-
-// ============================================
-// PROFILE TYPES
-// ============================================
-
-/**
- * Athlete profile - basic info and preferences
- */
-export interface AthleteProfile {
-  name: string;
-  goalEvent?: {
-    name: string;
-    date: string;
-    distance: string;
-    goalTime?: string;
-  };
-  methodology: string;
-  currentPhase: string;
-  weeklyRunDays: number;
-  experienceLevel: 'beginner' | 'intermediate' | 'advanced';
+  timestamp?: string;
 }
 
 // ============================================
 // INTENT TYPES
 // ============================================
 
-/**
- * Classified intent of a user message
- */
-export type Intent =
-  | 'SESSION_REQUEST'
-  | 'SESSION_MODIFICATION'
-  | 'SESSION_FEEDBACK'
-  | 'PLAN_QUERY'
-  | 'PLAN_MODIFICATION'
-  | 'INJURY_REPORT'
-  | 'INJURY_FOLLOWUP'
-  | 'PROGRESS_QUERY'
-  | 'KNOWLEDGE_QUERY'
-  | 'MOTIVATION_ISSUE'
-  | 'GENERAL_CHAT'
-  | 'COMPLIANCE_REPORT'
-  | 'SKIP_REPORT'
-  | 'CLARIFICATION';
+export enum Intent {
+  // Greetings & Social
+  GREETING = 'GREETING',
+  GRATITUDE = 'GRATITUDE',
+  AFFIRMATION = 'AFFIRMATION',
+  FAREWELL = 'FAREWELL',
+  
+  // Workout Related
+  SESSION_REQUEST = 'SESSION_REQUEST',
+  SESSION_MODIFICATION = 'SESSION_MODIFICATION',
+  SESSION_FEEDBACK = 'SESSION_FEEDBACK',
+  
+  // Check-ins & Logging
+  CHECK_IN = 'CHECK_IN',
+  COMPLIANCE_REPORT = 'COMPLIANCE_REPORT',
+  SKIP_REPORT = 'SKIP_REPORT',
+  
+  // Planning
+  PLAN_QUERY = 'PLAN_QUERY',
+  PLAN_MODIFICATION = 'PLAN_MODIFICATION',
+  
+  // Health & Safety
+  INJURY_REPORT = 'INJURY_REPORT',
+  INJURY_FOLLOWUP = 'INJURY_FOLLOWUP',
+  FATIGUE_REPORT = 'FATIGUE_REPORT',
+  
+  // Emotional
+  MOTIVATION_ISSUE = 'MOTIVATION_ISSUE',
+  ANXIETY_EXPRESSION = 'ANXIETY_EXPRESSION',
+  FRUSTRATION_EXPRESSION = 'FRUSTRATION_EXPRESSION',
+  
+  // Knowledge
+  KNOWLEDGE_QUERY = 'KNOWLEDGE_QUERY',
+  PROGRESS_QUERY = 'PROGRESS_QUERY',
+  
+  // Other
+  GENERAL_CHAT = 'GENERAL_CHAT',
+  CONFUSION = 'CONFUSION',
+  OFF_TOPIC = 'OFF_TOPIC',
+}
 
-// Add new card type definitions
+export interface ClassificationResult {
+  intent: Intent;
+  confidence: number;
+  entities: Record<string, string | number>;
+  sentiment: 'positive' | 'neutral' | 'negative';
+}
+
+// ============================================
+// MEMORY TYPES
+// ============================================
+
+export interface ImmutableCore {
+  name: string;
+  experience: string;
+  goal?: string;
+  constraints?: string;
+  style?: string;
+}
+
+export interface PerformanceMetrics {
+  prs: Array<{ distance: string; time: string; date: string }>;
+  zones: TrainingZones;
+  hrZones?: { z1: number[]; z2: number[]; z3: number[]; z4: number[]; z5: number[] };
+  fitness: FitnessMetrics;
+}
+
+export interface BehavioralPatterns {
+  trainingResponse: string;
+  complianceByDay: Record<string, number>;
+  communicationStyle: string;
+  emotionalTriggers: string[];
+  riskFactors: string[];
+}
+
+export interface ActiveThread {
+  area: string;
+  severity: number;
+  status: 'active' | 'monitoring' | 'resolved';
+  startDate: string;
+  notes?: string;
+}
+
+export interface ActiveThreads {
+  injuries: ActiveThread[];
+  pendingFollowUps: string[];
+  focusAreas: string[];
+  recentConcerns: string[];
+  coachCommitments: string[];
+}
+
+export interface SessionMemory {
+  recentWorkouts: WorkoutLog[];
+  conversationHighlights: string[];
+  unresolvedItems: string[];
+  todayPlan?: string;
+}
+
+export interface CoachMemory {
+  core: ImmutableCore;
+  metrics: PerformanceMetrics;
+  patterns: BehavioralPatterns;
+  threads: ActiveThreads;
+  session: SessionMemory;
+}
+
+// ============================================
+// CONTEXT TYPES
+// ============================================
+
+export interface MemoryContext {
+  athlete: string;
+  goal?: string;
+  fitness?: string;
+  today?: string;
+  injury?: string;
+  pattern?: string;
+  recent?: string;
+}
+
+export interface HandlerContext {
+  message: string;
+  intent: Intent;
+  confidence: number;
+  athleteId: string;
+  memory: CoachMemory;
+  memoryContext: MemoryContext;
+  conversationHistory: ConversationMessage[];
+}
+
+export interface HandlerResult {
+  response: {
+    message: string;
+    session?: any;
+    alert?: any;
+    actions?: any[];
+    confidence?: 'high' | 'medium' | 'low';
+  };
+  memoryUpdates?: any;
+  tokensUsed: number;
+  modelUsed: string;
+}

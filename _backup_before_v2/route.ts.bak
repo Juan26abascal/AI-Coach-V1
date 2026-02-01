@@ -80,34 +80,27 @@ export async function POST(req: Request) {
     // COACH BRAIN PROCESSING
     // ============================================
 
-    // Step 1: Compute athlete state (with empty data for now)
+    // Step 1: Compute athlete state
+    let athleteState;
     let stateString = '';
-    let gateString = '';
-    
     try {
-      // Create minimal input for state computation
-      const stateInput = {
-        workouts: [],
-        checkIns: [],
-        profile: undefined,
-        goalDate: undefined,
-        scheduledToday: undefined,
-      };
-      const athleteState = computeAthleteState(stateInput);
+      athleteState = computeAthleteState();
       stateString = formatStateForPrompt(athleteState);
-
-      // Step 2: Run decision gates
-      const gateContext = {
-        state: athleteState,
-        userMessage: message,
-        requestedSession: undefined,
-        timeAvailable: undefined,
-      };
-      const gateResults = runDecisionGates(gateContext);
-      gateString = formatGateResultsForPrompt(gateResults);
     } catch (stateError) {
       console.warn('Could not compute athlete state:', stateError);
-      stateString = 'No athlete data available.';
+      stateString = '=== ATHLETE STATE ===\nNo athlete data available.\n=== END STATE ===';
+    }
+
+    // Step 2: Run decision gates
+    let gateResults;
+    let gateString = '';
+    try {
+      if (athleteState) {
+        gateResults = runDecisionGates(athleteState);
+        gateString = formatGateResultsForPrompt(gateResults);
+      }
+    } catch (gateError) {
+      console.warn('Could not run decision gates:', gateError);
     }
 
     // Step 3: Build the full prompt
@@ -157,22 +150,8 @@ export async function POST(req: Request) {
     // Step 6: Parse the response into structured format
     let parsedResponse: CoachResponse;
     try {
-      const parseResult = parseCoachResponse(rawText);
-      if (parseResult.success && parseResult.data) {
-        const sanitizeResult = sanitizeResponse(parseResult.data);
-        parsedResponse = sanitizeResult.sanitized;
-        
-        // Log any warnings
-        if (sanitizeResult.warnings.length > 0) {
-          console.warn('Response warnings:', sanitizeResult.warnings);
-        }
-      } else {
-        // Fallback to raw text
-        parsedResponse = {
-          message: rawText,
-          confidence: 'low'
-        };
-      }
+      parsedResponse = parseCoachResponse(rawText);
+      parsedResponse = sanitizeResponse(parsedResponse);
     } catch (parseError) {
       console.warn('Response parsing failed, using raw text:', parseError);
       parsedResponse = {
