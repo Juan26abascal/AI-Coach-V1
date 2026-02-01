@@ -14,6 +14,7 @@ import {
   runDecisionGates,
   type ConversationMessage,
 } from '@/lib/coach';
+import type { CoachResponse } from '@/lib/coach/schema';
 import type { CoachBlock, ChatMessage } from '@/types';
 
 type RateLimitEntry = {
@@ -45,37 +46,63 @@ function isRateLimited(clientId: string): boolean {
   return false;
 }
 
-function buildBlocks(summary: string, prescription: string, integrationNote: string): CoachBlock[] {
-  const normalizeBullets = (value: string) =>
-    value
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean);
+function buildBlocksFromResponse(response: CoachResponse): CoachBlock[] {
+  const blocks: CoachBlock[] = [];
 
-  return [
-    {
+  // Add message block
+  if (response.message) {
+    blocks.push({
       title: 'Summary',
-      bullets: normalizeBullets(summary),
-    },
-    {
-      title: 'Prescription',
-      bullets: normalizeBullets(prescription),
-    },
-    {
-      title: 'Integration Note',
-      bullets: normalizeBullets(integrationNote),
-    },
-  ];
-}
+      bullets: response.message.split('\n').map(line => line.trim()).filter(Boolean),
+    });
+  }
 
-function toChatMessages(conversationHistory?: ConversationMessage[]): ChatMessage[] {
-  if (!conversationHistory?.length) return [];
-  return conversationHistory.map((message, index) => ({
-    id: `history-${index}`,
-    role: message.role === 'assistant' ? 'assistant' : 'user',
-    content: message.content,
-    timestamp: new Date().toISOString(),
-  }));
+  // Add session block if present
+  if (response.session) {
+    const session = response.session;
+    const sessionBullets: string[] = [];
+
+    if (session.duration) {
+      sessionBullets.push(`Duration: ${session.duration}`);
+    }
+    if (session.effort) {
+      sessionBullets.push(`Effort: ${session.effort}`);
+    }
+    if (session.warmup) {
+      sessionBullets.push(`Warmup: ${session.warmup.duration} - ${session.warmup.description}`);
+    }
+    if (session.main) {
+      sessionBullets.push(`Main: ${session.main.structure}`);
+      if (session.main.target) {
+        sessionBullets.push(`Target: ${session.main.target}`);
+      }
+      if (session.main.recovery) {
+        sessionBullets.push(`Recovery: ${session.main.recovery}`);
+      }
+    }
+    if (session.cooldown) {
+      sessionBullets.push(`Cooldown: ${session.cooldown.duration} - ${session.cooldown.description}`);
+    }
+    if (session.totalTime) {
+      sessionBullets.push(`Total time: ${session.totalTime}`);
+    }
+
+    blocks.push({
+      title: session.title || 'Workout',
+      bullets: sessionBullets,
+    });
+  }
+
+  // Add alert block if present
+  if (response.alert) {
+    blocks.push({
+      title: response.alert.title,
+      bullets: [response.alert.details],
+      note: `Severity: ${response.alert.severity}`,
+    });
+  }
+
+  return blocks;
 }
 
 function normalizeConversationHistory(conversationHistory?: ConversationMessage[]) {
@@ -95,16 +122,31 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const message = typeof body?.message === 'string' ? body.message.trim() : '';
-    const conversationHistory = Array.isArray(body?.conversationHistory)
-      ? (body.conversationHistory as ConversationMessage[])
-      : undefined;
+
+    // Extract context from the request body (sent by the store)
+    const context = body?.context ?? {};
+    const athlete = context.athlete ?? null;
+    const plan = context.plan ?? null;
+    const workouts = Array.isArray(context.workouts) ? context.workouts : [];
+    const checkIns = Array.isArray(context.checkIns) ? context.checkIns : [];
+    const recentMessages = Array.isArray(context.recentMessages) ? context.recentMessages : [];
+
+    // Convert recentMessages to ConversationMessage format
+    const conversationHistory: ConversationMessage[] = recentMessages.map((msg: ChatMessage) => ({
+      role: msg.role === 'assistant' ? 'assistant' : 'user',
+      content: msg.content,
+    }));
 
     if (!message) {
       return NextResponse.json({ error: 'Message is required.' }, { status: 400 });
     }
 
     const safety = deriveSafetyFlags(message, {
-      recentMessages: toChatMessages(conversationHistory),
+      athlete,
+      plan,
+      workouts,
+      checkIns,
+      recentMessages,
     });
 
     console.info('coach: computing athlete state');
@@ -137,7 +179,7 @@ export async function POST(request: Request) {
         ],
         tools: fileSearchTool ? [fileSearchTool] : undefined,
         tool_choice: 'auto',
-        max_tokens: 1000,
+        max_output_tokens: 1000,
       });
 
       let outputText = '';
@@ -153,17 +195,13 @@ export async function POST(request: Request) {
 
       const parsed = parseCoachResponse(finalResponse.output_text ?? outputText);
       const validated = parsed ? finalizeCoachResponse(parsed, safety) : fallbackCoachResponse(safety);
-      const blocks = buildBlocks(
-        validated.summary,
-        validated.prescription,
-        validated.integrationNote
-      );
+      const blocks = buildBlocksFromResponse(validated);
 
       return NextResponse.json({ ...validated, blocks });
     } catch (error) {
       console.error('coach: OpenAI request failed', error);
       const fallback = fallbackCoachResponse(safety);
-      const blocks = buildBlocks(fallback.summary, fallback.prescription, fallback.integrationNote);
+      const blocks = buildBlocksFromResponse(fallback);
       return NextResponse.json({ ...fallback, blocks }, { status: 200 });
     }
   } catch (error) {

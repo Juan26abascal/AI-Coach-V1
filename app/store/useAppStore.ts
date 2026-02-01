@@ -192,11 +192,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
 
       const data = await apiResponse.json();
+      // Handle both old format (summary) and new format (message)
+      const responseContent = (data as { message?: string }).message
+        ?? (data as { summary?: string }).summary
+        ?? 'Coach response ready.';
       const coachMessage = await fetchJson<{ message: ChatMessage }>('/api/messages', {
         method: 'POST',
         body: JSON.stringify({
-          role: 'coach',
-          content: (data as { summary?: string }).summary ?? 'Coach response ready.',
+          role: 'assistant',
+          content: responseContent,
+          structuredContent: data,
           blocks: (data as { blocks?: unknown[] }).blocks ?? [],
         }),
       });
@@ -247,11 +252,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
 
       const response = await apiResponse.json();
+      // Handle both old format (summary) and new format (message)
+      const checkInResponseContent = (response as { message?: string }).message
+        ?? (response as { summary?: string }).summary
+        ?? 'Coach response ready.';
       const coachMessage = await fetchJson<{ message: ChatMessage }>('/api/messages', {
         method: 'POST',
         body: JSON.stringify({
-          role: 'coach',
-          content: (response as { summary?: string }).summary ?? 'Coach response ready.',
+          role: 'assistant',
+          content: checkInResponseContent,
+          structuredContent: response,
           blocks: (response as { blocks?: unknown[] }).blocks ?? [],
         }),
       });
