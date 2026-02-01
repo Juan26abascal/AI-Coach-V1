@@ -11,7 +11,7 @@ export async function POST(request: Request) {
       role: body.role,
       content: body.content,
       blocks: body.blocks,
-      createdAt: body.createdAt,
+      timestamp: body.timestamp,
     });
     return NextResponse.json({ message });
   } catch (error) {

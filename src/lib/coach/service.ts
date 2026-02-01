@@ -72,17 +72,17 @@ async function requestCoachModelResponse(
         max_num_results: 4,
       },
     ],
-    response_format: {
-      type: 'json_schema',
-      json_schema: {
+    text: {
+      format: {
+        type: 'json_schema',
         name: 'coach_response',
         strict: true,
         schema: coachResponseJsonSchema,
       },
     },
-  });
+  } as Parameters<typeof openai.responses.create>[0]);
 
-  return response.output_text ?? null;
+  return (response as { output_text?: string }).output_text ?? null;
 }
 
 function parseCoachResponse(outputText: string | null): CoachResponse | null {

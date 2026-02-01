@@ -1,11 +1,12 @@
 import { clearAll, saveAthleteProfile, saveCheckIn, saveSession } from "../storage";
 import { computeAthleteState, formatStateForPrompt } from "./state-engine";
+import type { AthleteProfile, CheckInData, SessionLog, SessionPrescription } from "./types";
 
 const now = new Date();
 const isoDaysAgo = (days: number) =>
   new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
 
-const testCheckIns = [
+const testCheckIns: CheckInData[] = [
   {
     readiness: 72,
     soreness: 27,
@@ -30,128 +31,45 @@ const testCheckIns = [
   },
 ];
 
-const nowBack = new Date();
 const sessionDates = [2, 4, 6, 9, 12].map((d) => isoDaysAgo(d));
 
-const testSessions = [
-  {
-    id: "session-1",
-    date: sessionDates[0],
-    plannedSession: {
-      type: "easy",
-      title: "Recovery jog",
-      warmup: {
-        duration: "10 min",
-        description: "Easy pace warmup",
-      },
-      main: {
-        structure: "30 min easy run",
-        target: "Conversational pace",
-      },
-      cooldown: {
-        duration: "5 min",
-        description: "Walk and stretch",
-      },
-      totalTime: "45 min",
-    },
-    status: "completed",
-    actualDuration: 42,
+const createSession = (
+  id: string,
+  date: string,
+  type: SessionPrescription['type'],
+  title: string,
+  warmupDuration: string,
+  warmupDesc: string,
+  mainStructure: string,
+  mainTarget: string,
+  cooldownDuration: string,
+  cooldownDesc: string,
+  totalTime: string,
+  actualDuration: number
+): SessionLog => ({
+  id,
+  date,
+  plannedSession: {
+    type,
+    title,
+    warmup: { duration: warmupDuration, description: warmupDesc },
+    main: { structure: mainStructure, target: mainTarget },
+    cooldown: { duration: cooldownDuration, description: cooldownDesc },
+    totalTime,
   },
-  {
-    id: "session-2",
-    date: sessionDates[1],
-    plannedSession: {
-      type: "threshold",
-      title: "Tempo mix",
-      warmup: {
-        duration: "15 min",
-        description: "Easy jog",
-      },
-      main: {
-        structure: "3x8min @ tempo",
-        target: "8:00/mile with 2 min jog recoveries",
-      },
-      cooldown: {
-        duration: "10 min",
-        description: "Jog and strides",
-      },
-      totalTime: "50 min",
-    },
-    status: "completed",
-    actualDuration: 51,
-  },
-  {
-    id: "session-3",
-    date: sessionDates[2],
-    plannedSession: {
-      type: "long",
-      title: "Endurance builder",
-      warmup: {
-        duration: "15 min",
-        description: "Easy warmup",
-      },
-      main: {
-        structure: "90 min long run",
-        target: "Zone 2 effort",
-      },
-      cooldown: {
-        duration: "10 min",
-        description: "Walk plus core",
-      },
-      totalTime: "115 min",
-    },
-    status: "completed",
-    actualDuration: 110,
-  },
-  {
-    id: "session-4",
-    date: sessionDates[3],
-    plannedSession: {
-      type: "speed",
-      title: "Track ladders",
-      warmup: {
-        duration: "20 min",
-        description: "Dynamic warmup + strides",
-      },
-      main: {
-        structure: "8x400m w/ 400m jog",
-        target: "5k pace with 90s jog",
-      },
-      cooldown: {
-        duration: "10 min",
-        description: "Easy jog",
-      },
-      totalTime: "40 min",
-    },
-    status: "completed",
-    actualDuration: 38,
-  },
-  {
-    id: "session-5",
-    date: sessionDates[4],
-    plannedSession: {
-      type: "easy",
-      title: "Recovery shakeout",
-      warmup: {
-        duration: "10 min",
-        description: "Easy stride",
-      },
-      main: {
-        structure: "25 min easy run",
-        target: "Keep HR low",
-      },
-      cooldown: {
-        duration: "5 min",
-        description: "Stretch",
-      },
-      totalTime: "40 min",
-    },
-    status: "completed",
-    actualDuration: 37,
-  },
+  status: 'completed',
+  actualDuration,
+});
+
+const testSessions: SessionLog[] = [
+  createSession("session-1", sessionDates[0], "easy", "Recovery jog", "10 min", "Easy pace warmup", "30 min easy run", "Conversational pace", "5 min", "Walk and stretch", "45 min", 42),
+  createSession("session-2", sessionDates[1], "threshold", "Tempo mix", "15 min", "Easy jog", "3x8min @ tempo", "8:00/mile with 2 min jog recoveries", "10 min", "Jog and strides", "50 min", 51),
+  createSession("session-3", sessionDates[2], "long", "Endurance builder", "15 min", "Easy warmup", "90 min long run", "Zone 2 effort", "10 min", "Walk plus core", "115 min", 110),
+  createSession("session-4", sessionDates[3], "speed", "Track ladders", "20 min", "Dynamic warmup + strides", "8x400m w/ 400m jog", "5k pace with 90s jog", "10 min", "Easy jog", "40 min", 38),
+  createSession("session-5", sessionDates[4], "easy", "Recovery shakeout", "10 min", "Easy stride", "25 min easy run", "Keep HR low", "5 min", "Stretch", "40 min", 37),
 ];
 
-const profile = {
+const profile: AthleteProfile = {
   name: "Manual Test Athlete",
   goalEvent: {
     name: "Mock Marathon",

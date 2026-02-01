@@ -5,7 +5,7 @@ import type { Athlete, TrainingPlan, Workout, ChatMessage, CheckIn } from '@/typ
 
 type OnboardingPayload = Omit<Athlete, 'id'>;
 
-type AppState = {
+export type AppState = {
   athlete: Athlete | null;
   plan: TrainingPlan | null;
   workouts: Workout[];

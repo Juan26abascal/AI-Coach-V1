@@ -24,6 +24,7 @@ const severityMeta: Record<
 };
 
 export default function AlertCard({ alert }: AlertCardProps) {
+  if (!alert) return null;
   const meta = severityMeta[alert.severity];
 
   return (

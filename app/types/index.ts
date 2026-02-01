@@ -36,12 +36,19 @@ export type Workout = {
   pain?: string;
 };
 
+export type CoachBlock = {
+  title: string;
+  bullets: string[];
+  note?: string;
+};
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   structuredContent?: CoachResponse;
   timestamp: string;
+  blocks?: CoachBlock[];
 }
 
 export type ChatMessage = Message;

@@ -9,6 +9,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as TrainingPlan;
     const plan = await savePlan(user.id, {
       weekOf: body.weekOf,
+      lastUpdated: body.lastUpdated ?? new Date().toISOString(),
       days: body.days,
       nextSession: body.nextSession,
     });
